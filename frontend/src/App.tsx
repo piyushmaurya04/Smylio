@@ -68,8 +68,8 @@ function AuthenticatedLayout() {
       <button className={`mobile-scrim ${mobileOpen ? 'is-visible' : ''}`} aria-label="Close navigation" onClick={() => setMobileOpen(false)} />
       <aside className={`sidebar ${mobileOpen ? 'sidebar-open' : ''}`}>
         <div className="brand-lockup">
-          <img className="brand-logo theme-logo-dark" src="/smylio-logo.png" alt="" />
-          <img className="brand-logo theme-logo-light" src="/smylio-logo-light.png" alt="" />
+          <img className="brand-logo theme-logo-dark" src="/brand/smylio-logo.png" alt="" />
+          <img className="brand-logo theme-logo-light" src="/brand/smylio-logo-light.png" alt="" />
           <div><strong>Smylio</strong><span>Renting Made Happier</span></div>
         </div>
         <div className="workspace-label">WORKSPACE</div>

@@ -52,6 +52,7 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
                                 "/", "/index.html", "/assets/**", "/favicon.ico",
+                                "/brand/**",
                                 "/login", "/register", "/profile", "/help",
                                 "/owner/**", "/tenant/**", "/actuator/health")
                         .permitAll()
