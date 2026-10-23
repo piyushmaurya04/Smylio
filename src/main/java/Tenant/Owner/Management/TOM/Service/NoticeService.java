@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -23,6 +25,7 @@ import Tenant.Owner.Management.TOM.Repository.UserRepository;
 
 @Service
 public class NoticeService {
+    private static final Logger logger = LoggerFactory.getLogger(NoticeService.class);
     private final NoticeRepository noticeRepository;
     private final PropertyRepository propertyRepository;
     private final UserRepository userRepository;
@@ -86,16 +89,24 @@ public class NoticeService {
         if (ownerId != null) {
             User owner = requireUser(ownerId);
             requireRole(owner, Constants.ROLE_OWNER);
-            String searchTerm = search == null || search.isBlank() ? null : search.trim();
-            return noticeRepository.findByOwnerWithFilters(ownerId, searchTerm, propertyId, pageable)
+            String searchTerm = search == null || search.isBlank() ? "" : search.trim();
+            Page<NoticeResponse> result = noticeRepository
+                    .findByOwnerWithFilters(ownerId, searchTerm, propertyId, pageable)
                     .map(this::toResponse);
+            logger.info("Notice owner query completed: ownerId={} page={} totalElements={}",
+                    ownerId, pageable.getPageNumber(), result.getTotalElements());
+            return result;
         }
 
         User tenant = requireUser(tenantId);
         requireRole(tenant, Constants.ROLE_TENANT);
-        String searchTerm = search == null || search.isBlank() ? null : search.trim();
-        return noticeRepository.findVisibleToTenant(tenantId, Constants.LEASE_ACTIVE, searchTerm, propertyId, pageable)
+        String searchTerm = search == null || search.isBlank() ? "" : search.trim();
+        Page<NoticeResponse> result = noticeRepository
+                .findVisibleToTenant(tenantId, Constants.LEASE_ACTIVE, searchTerm, propertyId, pageable)
                 .map(this::toResponse);
+        logger.info("Notice tenant query completed: tenantId={} page={} totalElements={}",
+                tenantId, pageable.getPageNumber(), result.getTotalElements());
+        return result;
     }
 
     @Transactional
@@ -136,6 +147,8 @@ public class NoticeService {
 
     private void requireRole(User user, String requiredRole) {
         if (!requiredRole.equals(user.getRole())) {
+            logger.warn("Notice access role mismatch: userId={} actualRole={} requiredRole={}",
+                    user.getId(), user.getRole(), requiredRole);
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "This action is not allowed for this user role");
         }

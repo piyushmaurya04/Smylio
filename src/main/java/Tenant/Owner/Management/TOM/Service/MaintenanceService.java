@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -28,6 +30,7 @@ import Tenant.Owner.Management.TOM.Repository.UserRepository;
 
 @Service
 public class MaintenanceService {
+    private static final Logger logger = LoggerFactory.getLogger(MaintenanceService.class);
     private final UserRepository userRepository;
     private final MaintenanceCommentRepository maintenanceCommentRepository;
     private final MaintenanceRequestRepository maintenanceRequestRepository;
@@ -99,17 +102,25 @@ public class MaintenanceService {
         if ((ownerId == null) == (tenantId == null)) {
             throw new IllegalArgumentException("Provide exactly one of ownerId or tenantId");
         }
-        String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
+        String normalizedSearch = search == null || search.isBlank() ? "" : search.trim();
         if (ownerId != null) {
             User owner = requireUser(ownerId);
             requireRole(owner, Constants.ROLE_OWNER);
-            return maintenanceRequestRepository.findOwnerRequests(ownerId, normalizedSearch, propertyId, pageable)
+            Page<MaintenanceResponse> result = maintenanceRequestRepository
+                    .findOwnerRequests(ownerId, normalizedSearch, propertyId, pageable)
                     .map(this::toResponse);
+            logger.info("Maintenance owner query completed: ownerId={} page={} totalElements={}",
+                    ownerId, pageable.getPageNumber(), result.getTotalElements());
+            return result;
         }
         User tenant = requireUser(tenantId);
         requireRole(tenant, Constants.ROLE_TENANT);
-        return maintenanceRequestRepository.findTenantRequests(tenantId, normalizedSearch, propertyId, pageable)
+        Page<MaintenanceResponse> result = maintenanceRequestRepository
+                .findTenantRequests(tenantId, normalizedSearch, propertyId, pageable)
                 .map(this::toResponse);
+        logger.info("Maintenance tenant query completed: tenantId={} page={} totalElements={}",
+                tenantId, pageable.getPageNumber(), result.getTotalElements());
+        return result;
     }
 
     @Transactional(readOnly = true)
@@ -218,6 +229,8 @@ public class MaintenanceService {
 
     private void requireRole(User user, String requiredRole) {
         if (!requiredRole.equals(user.getRole())) {
+            logger.warn("Maintenance access rejected: userId={} actualRole={} requiredRole={}",
+                    user.getId(), user.getRole(), requiredRole);
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This action is not allowed for this user role");
         }
     }
