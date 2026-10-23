@@ -53,7 +53,7 @@ public class SecurityConfiguration {
                         .requestMatchers(
                                 "/", "/index.html", "/assets/**", "/favicon.ico",
                                 "/login", "/register", "/profile", "/help",
-                                "/owner/**", "/tenant/**")
+                                "/owner/**", "/tenant/**", "/actuator/health")
                         .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
                         .requestMatchers("/api/auth/**").denyAll()
