@@ -1,0 +1,14 @@
+.git
+.github
+.idea
+.vscode
+**/node_modules
+**/dist
+**/target
+**/.env
+**/.env.*
+!.env.example
+*.log
+docs
+TOM design.*
+Smylio logo.png
