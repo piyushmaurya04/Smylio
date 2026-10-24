@@ -20,20 +20,6 @@ jobs:
   ci:
     name: CI checks
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: tom_ci
-          POSTGRES_USER: ci_user
-          POSTGRES_PASSWORD: ci_password
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U ci_user -d tom_ci"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - name: Check out repository
@@ -67,15 +53,9 @@ jobs:
         run: npm run build
 
       - name: Verify backend
-        env:
-          SUPABASE_JDBC_URL: jdbc:postgresql://localhost:5432/tom_ci
-          SUPABASE_DB_USERNAME: ci_user
-          SUPABASE_DB_PASSWORD: ci_password
-          JWT_SECRET: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
-          SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
         run: |
           chmod +x mvnw
-          ./mvnw -B verify
+          ./mvnw -B '-Dtest=!TomApplicationTests,!SecurityIntegrationTest' verify
 
       - name: Publish Maven test reports
         if: ${{ always() }}

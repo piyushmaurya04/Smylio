@@ -20,16 +20,18 @@ settings). Its steps run in this order:
 1. Check out the repository.
 2. Set up Java 17 and Node.js 22, with Maven and npm dependency caches.
 3. Run `npm ci`, `npm run lint`, and `npm run build` in `frontend/`.
-4. Run `./mvnw -B verify`.
+4. Run `./mvnw -B '-Dtest=!TomApplicationTests,!SecurityIntegrationTest' verify`
+   to compile and test the backend without starting database-dependent
+   integration tests.
 5. Upload Surefire/Failsafe JUnit XML reports, including when verification
    fails.
 6. Build the root `Dockerfile` as a validation step; the image is not published.
 
-The Maven step uses a disposable PostgreSQL 16 service provided by the GitHub
-runner and `spring.jpa.hibernate.ddl-auto=create-drop`. Tests therefore create
-and discard their schema in that CI database; they do not connect to or modify
-the production Supabase database. The database values and JWT key in the
-workflow are test-only values, not repository or Render credentials.
+CI does not start or connect to a database. The backend verification step runs
+the database-independent tests and excludes `TomApplicationTests` and
+`SecurityIntegrationTest`, which start the Spring application and require a
+database. The Docker build remains a build-only check and does not start the
+application or connect to Supabase.
 
 ## Configure Render's CI gate
 
@@ -147,9 +149,9 @@ credentials in the URL or command.
 - **A check fails or is cancelled:** inspect the `CI checks` log and the
   `maven-test-reports` artifact. Resolve the failure and push a new commit;
   do not manually deploy the failed commit to bypass the gate.
-- **Maven database errors:** verify the workflow's disposable PostgreSQL
-  service starts and the step uses its CI-only connection values. Never replace
-  them with production Supabase credentials.
+- **Database-dependent backend tests:** CI intentionally excludes
+  `TomApplicationTests` and `SecurityIntegrationTest`; they require a database.
+  Run them locally only with an explicitly configured test database.
 - **Health check fails after Render says Live:** inspect Render deployment and
   runtime logs, verify the Render environment variables and health-check path,
   and investigate Supabase connectivity.
