@@ -55,7 +55,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   return (
     <div className="auth-screen">
       <div className="auth-visual">
-        <div className="auth-visual-top"><img className="auth-brand-logo theme-logo-dark" src="/smylio-logo.png" alt="" /><img className="auth-brand-logo theme-logo-light" src="/smylio-logo-light.png" alt="" /><span>Smylio <small>RENTING MADE HAPPIER</small></span></div>
+        <div className="auth-visual-top"><img className="auth-brand-logo theme-logo-dark" src="/brand/smylio-logo.png" alt="" /><img className="auth-brand-logo theme-logo-light" src="/brand/smylio-logo-light.png" alt="" /><span>Smylio <small>RENTING MADE HAPPIER</small></span></div>
         <div className="auth-visual-content">
           <p className="eyebrow">TENANT & OWNER MANAGEMENT</p>
           <h1>Every property,<br /><em>in good order.</em></h1>
@@ -64,7 +64,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         <div className="auth-visual-foot"><span>SECURE WORKSPACE</span><span>JWT protected</span></div>
       </div>
       <div className="auth-panel-wrap">
-        <div className="auth-mobile-brand"><img className="auth-brand-logo theme-logo-dark" src="/smylio-logo.png" alt="" /><img className="auth-brand-logo theme-logo-light" src="/smylio-logo-light.png" alt="" /><span>Smylio</span></div>
+        <div className="auth-mobile-brand"><img className="auth-brand-logo theme-logo-dark" src="/brand/smylio-logo.png" alt="" /><img className="auth-brand-logo theme-logo-light" src="/brand/smylio-logo-light.png" alt="" /><span>Smylio</span></div>
         <section className="auth-panel">
           <div className="auth-heading"><div className="auth-icon"><LockKeyhole size={18} /></div><p className="eyebrow">{registering ? 'CREATE ACCOUNT' : 'WELCOME BACK'}</p><h2>{registering ? 'Create your account' : 'Sign in to Smylio'}</h2><p>{registering ? 'Set up your owner or tenant access.' : 'Use your account credentials to continue.'}</p></div>
           {error && <InlineError>{error}</InlineError>}

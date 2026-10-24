@@ -75,10 +75,16 @@ Open `http://localhost:8080`.
 
 ## Deploy to Render
 
+See [GitHub Actions CI/CD](docs/GITHUB_ACTIONS_CICD.md) for CI checks, Render's
+CI-gated auto-deployment setup, and production verification instructions.
+
 Create a Render **Web Service**, connect this repository, choose **Docker**, and
 set `SUPABASE_JDBC_URL`, `SUPABASE_DB_USERNAME`, `SUPABASE_DB_PASSWORD`, and
-`JWT_SECRET` in the service's environment settings. Render provides `PORT`
-automatically.
+`JWT_SECRET` in the service's environment settings. Set the Render health check
+path to `/actuator/health`. Render provides `PORT` automatically.
+
+The public `/actuator/health` endpoint returns the application health status and
+checks database connectivity. It does not expose health details.
 
 Never commit database credentials, JWT secrets, or `.env` files. The application
 connects to Supabase from the backend; do not expose database credentials in the

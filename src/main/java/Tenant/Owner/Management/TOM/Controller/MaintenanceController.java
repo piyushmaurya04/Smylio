@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.server.ResponseStatusException;
 
 import Tenant.Owner.Management.TOM.DTO.CommentResponse;
@@ -32,6 +34,7 @@ import Tenant.Owner.Management.TOM.Security.JwtPrincipal;
 @RestController
 @RequestMapping("/api/maintenance")
 public class MaintenanceController {
+    private static final Logger logger = LoggerFactory.getLogger(MaintenanceController.class);
     private static final int MAX_PAGE_SIZE = 5;
     private final MaintenanceService maintenanceService;
 
@@ -54,7 +57,13 @@ public class MaintenanceController {
                 Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
         Long ownerId = JwtPrincipal.ownerIdOrNull(jwt);
         Long tenantId = JwtPrincipal.tenantIdOrNull(jwt);
-        return maintenanceService.getRequestsPage(ownerId, tenantId, pageable, search, propertyId);
+        logger.info("Maintenance list requested: actorRole={} actorId={} page={} size={} propertyId={}",
+                jwt.getClaimAsString("role"), jwt.getSubject(), page, pageable.getPageSize(), propertyId);
+        Page<MaintenanceResponse> result = maintenanceService.getRequestsPage(
+                ownerId, tenantId, pageable, search, propertyId);
+        logger.info("Maintenance list completed: actorRole={} actorId={} page={} totalElements={}",
+                jwt.getClaimAsString("role"), jwt.getSubject(), page, result.getTotalElements());
+        return result;
     }
 
     @GetMapping("/{id}")

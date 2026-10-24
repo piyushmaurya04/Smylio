@@ -115,13 +115,13 @@ class NoticeServiceTest {
         User tenant = user(7L, Constants.ROLE_TENANT);
         var pageable = PageRequest.of(0, 5);
         when(userRepository.findById(7L)).thenReturn(Optional.of(tenant));
-        when(noticeRepository.findVisibleToTenant(7L, Constants.LEASE_ACTIVE, null, null, pageable))
+        when(noticeRepository.findVisibleToTenant(7L, Constants.LEASE_ACTIVE, "", null, pageable))
                 .thenReturn(new PageImpl<>(Collections.emptyList(), pageable, 0));
 
         var result = noticeService.getNoticesPage(null, 7L, pageable, null, null);
 
         assertEquals(0, result.getTotalElements());
-        verify(noticeRepository).findVisibleToTenant(7L, Constants.LEASE_ACTIVE, null, null, pageable);
+        verify(noticeRepository).findVisibleToTenant(7L, Constants.LEASE_ACTIVE, "", null, pageable);
     }
 
     @Test

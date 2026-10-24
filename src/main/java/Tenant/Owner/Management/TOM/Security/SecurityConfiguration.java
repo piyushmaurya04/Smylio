@@ -1,10 +1,13 @@
 package Tenant.Owner.Management.TOM.Security;
 
-import java.util.List;
 import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import jakarta.servlet.http.HttpServletResponse;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,17 +15,21 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 public class SecurityConfiguration {
+    private static final Logger logger = LoggerFactory.getLogger(SecurityConfiguration.class);
+
     @Bean
     CorsConfigurationSource corsConfigurationSource(
             @Value("${app.cors.allowed-origins:http://localhost:5173}") String allowedOrigins) {
@@ -49,11 +56,14 @@ public class SecurityConfiguration {
         http.csrf(AbstractHttpConfigurer::disable)
                 .cors(org.springframework.security.config.Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(exceptions -> exceptions
+                        .accessDeniedHandler(accessDeniedHandler()))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
                                 "/", "/index.html", "/assets/**", "/favicon.ico",
+                                "/brand/**",
                                 "/login", "/register", "/profile", "/help",
-                                "/owner/**", "/tenant/**")
+                                "/owner/**", "/tenant/**", "/actuator/health")
                         .permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
                         .requestMatchers("/api/auth/**").denyAll()
@@ -90,9 +100,27 @@ public class SecurityConfiguration {
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(resourceServer -> resourceServer
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
-                        .authenticationEntryPoint((request, response, exception) -> response
-                                .sendError(HttpServletResponse.SC_UNAUTHORIZED)));
+                        .authenticationEntryPoint((request, response, exception) -> {
+                            logger.warn("Authentication failed: method={} path={} reason={}",
+                                    request.getMethod(), request.getRequestURI(), exception.getClass().getSimpleName());
+                            response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+                        }));
         return http.build();
+    }
+
+    private AccessDeniedHandler accessDeniedHandler() {
+        return (request, response, exception) -> {
+            Authentication authentication = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication();
+            String authorities = authentication == null ? "none" : authentication.getAuthorities().stream()
+                    .map(authority -> authority.getAuthority())
+                    .collect(Collectors.joining(","));
+            logger.warn("Authorization denied: method={} path={} authenticated={} authorities={} reason={}",
+                    request.getMethod(), request.getRequestURI(),
+                    authentication != null && authentication.isAuthenticated(),
+                    authorities, exception.getClass().getSimpleName());
+            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+        };
     }
 
     private JwtAuthenticationConverter jwtAuthenticationConverter() {
