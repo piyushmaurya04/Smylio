@@ -75,6 +75,9 @@ Open `http://localhost:8080`.
 
 ## Deploy to Render
 
+See [GitHub Actions CI/CD](docs/GITHUB_ACTIONS_CICD.md) for CI checks, Render's
+CI-gated auto-deployment setup, and production verification instructions.
+
 Create a Render **Web Service**, connect this repository, choose **Docker**, and
 set `SUPABASE_JDBC_URL`, `SUPABASE_DB_USERNAME`, `SUPABASE_DB_PASSWORD`, and
 `JWT_SECRET` in the service's environment settings. Set the Render health check
