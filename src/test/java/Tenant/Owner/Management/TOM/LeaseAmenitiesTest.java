@@ -44,8 +44,14 @@ class LeaseAmenitiesTest {
         tenant.setId(7L);
         tenant.setRole(Constants.ROLE_TENANT);
         tenant.setName("Tenant Seven");
+        User owner = new User();
+        owner.setId(11L);
+        owner.setName("Owner Eleven");
+        owner.setEmail("owner@example.com");
+        owner.setPhone("555-0100");
         Property property = new Property();
         property.setId(3L);
+        property.setOwnerId(11L);
         property.setTitle("Flat 3");
         property.setAmenities(new HashSet<>(Set.of("Wi-Fi", "Parking")));
         Lease lease = new Lease();
@@ -54,6 +60,7 @@ class LeaseAmenitiesTest {
         lease.setProperty(property);
         lease.setStatus(Constants.LEASE_ACTIVE);
         when(userRepository.findById(7L)).thenReturn(Optional.of(tenant));
+        when(userRepository.findById(11L)).thenReturn(Optional.of(owner));
         when(leaseRepository.findTenantLeasesWithDetails(7L, Constants.LEASE_ACTIVE))
                 .thenReturn(List.of(lease));
 
@@ -61,6 +68,9 @@ class LeaseAmenitiesTest {
 
         assertEquals(1, response.size());
         assertEquals(List.of("Parking", "Wi-Fi"), response.get(0).getAmenities());
+        assertEquals("Owner Eleven", response.get(0).getOwnerName());
+        assertEquals("owner@example.com", response.get(0).getOwnerEmail());
+        assertEquals("555-0100", response.get(0).getOwnerPhone());
         verify(leaseRepository).findTenantLeasesWithDetails(7L, Constants.LEASE_ACTIVE);
     }
 

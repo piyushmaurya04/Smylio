@@ -132,6 +132,11 @@ public class LeaseService {
         response.setTenantId(lease.getTenant().getId());
         response.setTenantName(lease.getTenant().getName());
         response.setTenantCode(lease.getTenant().getTenantCode());
+        User owner = userRepository.findById(lease.getProperty().getOwnerId())
+                .orElseThrow(() -> new java.util.NoSuchElementException("Property owner not found"));
+        response.setOwnerName(owner.getName());
+        response.setOwnerEmail(owner.getEmail());
+        response.setOwnerPhone(owner.getPhone());
         response.setStartDate(lease.getStartDate());
         response.setEndDate(lease.getEndDate());
         response.setMonthlyRent(lease.getMonthlyRent());

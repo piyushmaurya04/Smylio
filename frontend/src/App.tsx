@@ -18,6 +18,7 @@ import {
 import { useAuth } from './auth-context'
 import { ConfirmationDialog } from './components'
 import { AuthPage, DashboardPage, LeasesPage, MaintenanceDetailPage, MaintenancePage, NoticeDetailPage, NoticesPage, OwnerTenantDetailPage, ProfilePage, PropertiesPage, RentPage, TenantLeaseDetailPage } from './pages'
+import { FaqPage } from './faq'
 
 type Theme = 'dark' | 'light'
 
@@ -89,8 +90,7 @@ function AuthenticatedLayout() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="sidebar-note"><span className="connection-dot" /> API connected</div>
-          <button className="nav-link nav-link-button" onClick={() => navigate('/help')}><CircleHelp size={17} /><span>Help & support</span></button>
+          <button className="nav-link nav-link-button" onClick={() => navigate('/faq')}><CircleHelp size={17} /><span>FAQ</span></button>
           <div className="sidebar-footer">Smylio <span>•</span> v1.0</div>
         </div>
       </aside>
@@ -98,9 +98,8 @@ function AuthenticatedLayout() {
       <div className="main-column">
         <header className="topbar">
           <button className="icon-button menu-trigger" aria-label="Open navigation" onClick={() => setMobileOpen(true)}><Menu size={19} /></button>
-          <div className="breadcrumbs"><span>Workspace</span><span className="crumb-separator">/</span>{location.pathname === '/profile' ? <><NavLink to={user.role === 'OWNER' ? '/owner/overview' : '/tenant/overview'}>Overview</NavLink><span className="crumb-separator">/</span><strong>Profile</strong></> : isNoticeDetail ? <><NavLink to={noticesPath}>Notices</NavLink><span className="crumb-separator">/</span><strong>Notice details</strong></> : isMaintenanceDetail ? <><NavLink to={maintenancePath}>Maintenance</NavLink><span className="crumb-separator">/</span><strong>Request details</strong></> : isTenantLeaseDetail ? <><NavLink to="/tenant/overview">My home</NavLink><span className="crumb-separator">/</span><strong>Lease details</strong></> : isOwnerTenantDetail ? <><NavLink to="/owner/leases">Tenants & leases</NavLink><span className="crumb-separator">/</span><strong>Tenant details</strong></> : <strong>{pageTitle}</strong>}</div>
+          <div className="breadcrumbs"><span>Workspace</span><span className="crumb-separator">/</span>{location.pathname === '/profile' ? <><NavLink to={user.role === 'OWNER' ? '/owner/overview' : '/tenant/overview'}>Overview</NavLink><span className="crumb-separator">/</span><strong>Profile</strong></> : location.pathname === '/faq' ? <strong>FAQ</strong> : isNoticeDetail ? <><NavLink to={noticesPath}>Notices</NavLink><span className="crumb-separator">/</span><strong>Notice details</strong></> : isMaintenanceDetail ? <><NavLink to={maintenancePath}>Maintenance</NavLink><span className="crumb-separator">/</span><strong>Request details</strong></> : isTenantLeaseDetail ? <><NavLink to="/tenant/overview">My home</NavLink><span className="crumb-separator">/</span><strong>Lease details</strong></> : isOwnerTenantDetail ? <><NavLink to="/owner/leases">Tenants & leases</NavLink><span className="crumb-separator">/</span><strong>Tenant details</strong></> : <strong>{pageTitle}</strong>}</div>
           <div className="topbar-actions">
-            <span className="topbar-date">Tenant & owner management</span>
             <button className="icon-button theme-toggle" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
               {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
             </button>
@@ -150,15 +149,12 @@ function App() {
         <Route path="tenant/maintenance/:requestId" element={user?.role === 'TENANT' ? <MaintenanceDetailPage /> : <Navigate to={defaultPage} replace />} />
         <Route path="tenant/notices" element={user?.role === 'TENANT' ? <NoticesPage /> : <Navigate to={defaultPage} replace />} />
         <Route path="tenant/notices/:noticeId" element={user?.role === 'TENANT' ? <NoticeDetailPage /> : <Navigate to={defaultPage} replace />} />
-        <Route path="help" element={<HelpPage />} />
+        <Route path="faq" element={<FaqPage />} />
+        <Route path="help" element={<Navigate to="/faq" replace />} />
       </Route>
       <Route path="*" element={<DefaultRoute />} />
     </Routes>
   )
-}
-
-function HelpPage() {
-  return <section className="page-section"><div className="page-heading"><div><p className="eyebrow">SUPPORT</p><h1>Help & support</h1><p className="page-subtitle">For help with your property account, contact your workspace administrator.</p></div></div></section>
 }
 
 export default App
