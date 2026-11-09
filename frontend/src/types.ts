@@ -38,6 +38,9 @@ export interface Lease {
   tenantId: number
   tenantName: string
   tenantCode: string
+  ownerName: string
+  ownerEmail: string
+  ownerPhone?: string | null
   startDate: string
   endDate?: string | null
   monthlyRent: number

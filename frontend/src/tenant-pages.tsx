@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, ArrowUpRight, Bike, CalendarDays, Camera, Clock3, Copy, CreditCard, Home, LayoutGrid, MessageCircle, Package, Receipt, RefreshCw, Send, Snowflake, Sofa, Table2, Tv, Wallet } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Bike, CalendarDays, Camera, Clock3, Copy, CreditCard, Home, LayoutGrid, Mail, MessageCircle, Package, Phone, Receipt, RefreshCw, Send, Snowflake, Sofa, Table2, Tv, Wallet } from 'lucide-react'
 import { api, errorMessage } from './api'
 import { useAuth } from './auth-context'
 import { ConfirmationDialog, DataTable, EmptyState, InlineError, InlineSuccess, LoadingState, NoticeUnreadDot, PageHeading, Panel, StatCard, StatusBadge } from './components'
@@ -164,6 +164,14 @@ export function TenantLeaseDetailPage() {
                     : Package
           return <span key={amenity}><Icon size={16} />{amenity}</span>
         })}</div> : <p className="tenant-lease-no-amenities">No amenities listed</p>}
+      </section>
+      <section className="tenant-lease-owner">
+        <h3>Owner details</h3>
+        <strong>{lease.ownerName}</strong>
+        <div className="tenant-lease-owner-contacts">
+          <a href={`mailto:${lease.ownerEmail}`}><Mail size={15} />{lease.ownerEmail}</a>
+          {lease.ownerPhone && <a href={`tel:${lease.ownerPhone}`}><Phone size={15} />{lease.ownerPhone}</a>}
+        </div>
       </section>
     </article> : null}
   </section>

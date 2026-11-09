@@ -17,6 +17,9 @@ public class LeaseResponse {
     private Long tenantId;
     private String tenantName;
     private String tenantCode;
+    private String ownerName;
+    private String ownerEmail;
+    private String ownerPhone;
 
     private LocalDate startDate;
     private LocalDate endDate;

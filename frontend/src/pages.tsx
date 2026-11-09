@@ -20,6 +20,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const [error, setError] = useState('')
   const [values, setValues] = useState({ name: '', email: '', password: '', phone: '', role: 'TENANT' as Role })
   const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const [registrationStep, setRegistrationStep] = useState(1)
   const registering = mode === 'register'
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())
   const passwordBytes = new TextEncoder().encode(values.password).length
@@ -37,6 +38,12 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (registering && registrationStep === 1) {
+      setTouched((current) => ({ ...current, name: true }))
+      if (errors.name) return
+      setRegistrationStep(2)
+      return
+    }
     setTouched({ name: true, email: true, password: true, phone: true })
     if (errors.name || errors.email || errors.password || errors.phone) return
     setSubmitting(true)
@@ -61,32 +68,33 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           <h1>Every property,<br /><em>in good order.</em></h1>
           <p>One clear place to manage homes, leases, rent and the details that keep things running.</p>
         </div>
-        <div className="auth-visual-foot"><span>SECURE WORKSPACE</span><span>JWT protected</span></div>
       </div>
       <div className="auth-panel-wrap">
         <div className="auth-mobile-brand"><img className="auth-brand-logo theme-logo-dark" src="/brand/smylio-logo.png" alt="" /><img className="auth-brand-logo theme-logo-light" src="/brand/smylio-logo-light.png" alt="" /><span>Smylio</span></div>
         <section className="auth-panel">
-          <div className="auth-heading"><div className="auth-icon"><LockKeyhole size={18} /></div><p className="eyebrow">{registering ? 'CREATE ACCOUNT' : 'WELCOME BACK'}</p><h2>{registering ? 'Create your account' : 'Sign in to Smylio'}</h2><p>{registering ? 'Set up your owner or tenant access.' : 'Use your account credentials to continue.'}</p></div>
+          <div className="auth-heading"><div className="auth-icon"><LockKeyhole size={18} /></div><p className="eyebrow">{registering ? `CREATE ACCOUNT · STEP ${registrationStep} OF 2` : 'WELCOME BACK'}</p><h2>{registering ? 'Create your account' : 'Sign in to Smylio'}</h2><p>{registering ? registrationStep === 1 ? "Let's start with your full name." : 'Complete your account details.' : 'Use your account credentials to continue.'}</p></div>
           {error && <InlineError>{error}</InlineError>}
           <form className="form-stack" onSubmit={submit} noValidate>
-            {registering && <Field label="Full name" id="name" value={values.name} onChange={(value) => update('name', value)} onBlur={() => setTouched((current) => ({ ...current, name: true }))} error={touched.name ? errors.name : ''} required autoComplete="name" />}
-            <Field label="Email address" id="email" type="email" value={values.email} onChange={(value) => update('email', value)} onBlur={() => setTouched((current) => ({ ...current, email: true }))} error={touched.email ? errors.email : ''} required autoComplete="email" />
-            <div className="field-group">
-              <label htmlFor="password">Password <span className="required-mark">*</span></label>
-              <div className={`password-wrap ${touched.password && errors.password ? 'field-invalid' : ''}`}>
-                <input id="password" type={showPassword ? 'text' : 'password'} value={values.password} onChange={(event) => update('password', event.target.value)} onBlur={() => setTouched((current) => ({ ...current, password: true }))} autoComplete={registering ? 'new-password' : 'current-password'} required aria-invalid={Boolean(touched.password && errors.password)} aria-describedby={touched.password && errors.password ? 'password-error' : registering ? 'password-help' : undefined} />
-                <button type="button" className="field-icon-button" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+            {registering && registrationStep === 1 && <Field label="Full name" id="name" value={values.name} onChange={(value) => update('name', value)} onBlur={() => setTouched((current) => ({ ...current, name: true }))} error={touched.name ? errors.name : ''} required autoComplete="name" />}
+            {(!registering || registrationStep === 2) && <>
+              <Field label="Email address" id="email" type="email" value={values.email} onChange={(value) => update('email', value)} onBlur={() => setTouched((current) => ({ ...current, email: true }))} error={touched.email ? errors.email : ''} required autoComplete="email" />
+              <div className="field-group">
+                <label htmlFor="password">Password <span className="required-mark">*</span></label>
+                <div className={`password-wrap ${touched.password && errors.password ? 'field-invalid' : ''}`}>
+                  <input id="password" type={showPassword ? 'text' : 'password'} value={values.password} onChange={(event) => update('password', event.target.value)} onBlur={() => setTouched((current) => ({ ...current, password: true }))} autoComplete={registering ? 'new-password' : 'current-password'} required aria-invalid={Boolean(touched.password && errors.password)} aria-describedby={touched.password && errors.password ? 'password-error' : registering ? 'password-help' : undefined} />
+                  <button type="button" className="field-icon-button" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+                </div>
+                {touched.password && errors.password ? <span className="field-error" id="password-error">{errors.password}</span> : registering ? <span className="field-help" id="password-help">At least 8 characters, up to 72 UTF-8 bytes.</span> : null}
               </div>
-              {touched.password && errors.password ? <span className="field-error" id="password-error">{errors.password}</span> : registering ? <span className="field-help" id="password-help">At least 8 characters, up to 72 UTF-8 bytes.</span> : null}
-            </div>
-            {registering && <>
-              <Field label="Phone number" id="phone" type="tel" value={values.phone} onChange={(value) => update('phone', value)} onBlur={() => setTouched((current) => ({ ...current, phone: true }))} error={touched.phone ? errors.phone : ''} required autoComplete="tel" />
-              <div className="field-group"><label htmlFor="role">Account type <span className="required-mark">*</span></label><select id="role" value={values.role} onChange={(event) => update('role', event.target.value as Role)} required><option value="TENANT">Tenant</option><option value="OWNER">Owner</option></select></div>
+              {registering && <>
+                <Field label="Phone number" id="phone" type="tel" value={values.phone} onChange={(value) => update('phone', value)} onBlur={() => setTouched((current) => ({ ...current, phone: true }))} error={touched.phone ? errors.phone : ''} required autoComplete="tel" />
+                <div className="field-group"><label htmlFor="role">Account type <span className="required-mark">*</span></label><select id="role" value={values.role} onChange={(event) => update('role', event.target.value as Role)} required><option value="TENANT">Tenant</option><option value="OWNER">Owner</option></select></div>
+              </>}
             </>}
-            <button className="button button-primary button-wide" type="submit" disabled={submitting}>{submitting ? <><span className="spinner" /> {registering ? 'Creating account…' : 'Signing in…'}</> : registering ? 'Create account' : 'Sign in'}</button>
+            {registering && registrationStep === 2 && <button className="button button-wide" type="button" onClick={() => setRegistrationStep(1)}>Back</button>}
+            <button className="button button-primary button-wide" type="submit" disabled={submitting}>{submitting ? <><span className="spinner" /> {registering ? 'Creating account…' : 'Signing in…'}</> : registering && registrationStep === 1 ? 'Next' : registering ? 'Create account' : 'Sign in'}</button>
           </form>
           <p className="auth-switch">{registering ? 'Already registered?' : 'New to Smylio?'} <Link to={registering ? '/login' : '/register'}>{registering ? 'Sign in' : 'Create an account'}</Link></p>
-          <p className="auth-security"><LockKeyhole size={13} /> Protected with encrypted access tokens</p>
         </section>
       </div>
     </div>

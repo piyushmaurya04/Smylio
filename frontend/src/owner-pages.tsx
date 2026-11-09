@@ -61,7 +61,7 @@ export function OwnerDashboardPage() {
         <StatCard label="Open issues" value={String(summary.openMaintenanceCount)} detail="Open or in progress" tone={summary.openMaintenanceCount ? 'warning' : 'neutral'} />
       </div>
       <div className="dashboard-grid">
-        <Panel title="Cash payment approvals" description={`${approvals.length} awaiting your review`} action={<button className="button button-quiet" onClick={() => void generate()} disabled={busy !== null}>{busy === -1 ? <span className="spinner" /> : <RefreshCw size={14} />} Generate rent</button>}>
+        <Panel className="cash-approval-panel" title="Cash payment approvals" description={`${approvals.length} awaiting your review`} action={<button className="button button-quiet" onClick={() => void generate()} disabled={busy !== null}>{busy === -1 ? <span className="spinner" /> : <RefreshCw size={14} />} Generate rent</button>}>
           {approvals.length === 0 ? <EmptyState title="You're up to date" detail="Cash claims that need approval will appear here." /> : <DataTable headings={['Month', 'Amount', 'Due', 'Status', 'Actions']}>
             {approvals.map((rent) => <tr key={rent.id}><td>{rent.forMonth}</td><td>{formatCurrency(Number(rent.amount) + Number(rent.fine))}</td><td>{formatDate(rent.dueDate)}</td><td><StatusBadge status={rent.status} /></td><td className="table-actions"><button className="button button-small button-primary" disabled={busy === rent.id} onClick={() => setRentToApprove(rent)}><Check size={13} /> Accept</button><button className="button button-small button-danger" disabled={busy === rent.id} onClick={() => setRentToReject(rent)}><X size={13} /> Reject</button></td></tr>)}
           </DataTable>}
