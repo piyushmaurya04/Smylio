@@ -2,6 +2,8 @@ package Tenant.Owner.Management.TOM.Controller;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -75,7 +77,7 @@ public class MaintenanceController {
 
     @PostMapping
     public ResponseEntity<MaintenanceResponse> raiseRequest(
-            @RequestBody MaintenanceRequestCreate request,
+            @Valid @RequestBody MaintenanceRequestCreate request,
             @AuthenticationPrincipal Jwt jwt) {
         Long tenantId = JwtPrincipal.userId(jwt);
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -94,7 +96,7 @@ public class MaintenanceController {
     @PutMapping("/{id}/status")
     public MaintenanceResponse updateStatus(
             @PathVariable Long id,
-            @RequestBody MaintenanceStatusUpdate request,
+            @Valid @RequestBody MaintenanceStatusUpdate request,
             @AuthenticationPrincipal Jwt jwt) {
         Long ownerId = JwtPrincipal.userId(jwt);
         return maintenanceService.updateStatus(id, request.getStatus(), ownerId);
@@ -103,7 +105,7 @@ public class MaintenanceController {
     @PutMapping("/{id}")
     public MaintenanceResponse updateRequest(
             @PathVariable Long id,
-            @RequestBody MaintenanceRequestUpdate request,
+            @Valid @RequestBody MaintenanceRequestUpdate request,
             @AuthenticationPrincipal Jwt jwt) {
         Long tenantId = JwtPrincipal.userId(jwt);
         return maintenanceService.updateRequest(id, request, tenantId);
@@ -118,7 +120,7 @@ public class MaintenanceController {
     @PostMapping("/{id}/comments")
     public ResponseEntity<CommentResponse> addComment(
             @PathVariable Long id,
-            @RequestBody MaintenanceCommentCreate request,
+            @Valid @RequestBody MaintenanceCommentCreate request,
             @AuthenticationPrincipal Jwt jwt) {
         Long ownerId = JwtPrincipal.ownerIdOrNull(jwt);
         Long tenantId = JwtPrincipal.tenantIdOrNull(jwt);

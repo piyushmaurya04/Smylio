@@ -17,7 +17,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ResponseStatusException;
 
-import Tenant.Owner.Management.TOM.Constants.Constants;
+import Tenant.Owner.Management.TOM.Constants.LeaseStatus;
+import Tenant.Owner.Management.TOM.Constants.MaintenanceStatus;
+import Tenant.Owner.Management.TOM.Constants.RentStatus;
+import Tenant.Owner.Management.TOM.Constants.UserRole;
 import Tenant.Owner.Management.TOM.Entity.User;
 import Tenant.Owner.Management.TOM.Repository.LeaseRepository;
 import Tenant.Owner.Management.TOM.Repository.MaintenanceRequestRepository;
@@ -41,13 +44,13 @@ class DashboardServiceTest {
 
     @Test
     void ownerDashboardReturnsScopedCountsAndOutstandingRent() {
-        when(userRepository.findById(4L)).thenReturn(Optional.of(user(4L, Constants.ROLE_OWNER)));
-        when(leaseRepository.countDistinctTenantsByOwnerIdAndStatus(4L, Constants.LEASE_ACTIVE)).thenReturn(3L);
+        when(userRepository.findById(4L)).thenReturn(Optional.of(user(4L, UserRole.OWNER)));
+        when(leaseRepository.countDistinctTenantsByOwnerIdAndStatus(4L, LeaseStatus.ACTIVE)).thenReturn(3L);
         when(rentPaymentRepository.sumOutstandingByOwnerIdAndStatusIn(4L,
-                List.of(Constants.RENT_PENDING, Constants.RENT_LATE, Constants.RENT_AWAITING_APPROVAL)))
+                List.of(RentStatus.PENDING, RentStatus.LATE, RentStatus.AWAITING_APPROVAL)))
                 .thenReturn(new BigDecimal("2750.00"));
         when(maintenanceRequestRepository.countByProperty_OwnerIdAndStatusIn(4L,
-                List.of(Constants.MAINTENANCE_OPEN, Constants.MAINTENANCE_IN_PROGRESS))).thenReturn(2L);
+                List.of(MaintenanceStatus.OPEN, MaintenanceStatus.IN_PROGRESS))).thenReturn(2L);
 
         var dashboard = dashboardService.getOwnerDashboard(4L);
 
@@ -58,13 +61,13 @@ class DashboardServiceTest {
 
     @Test
     void emptyRentAggregateReturnsZero() {
-        when(userRepository.findById(4L)).thenReturn(Optional.of(user(4L, Constants.ROLE_OWNER)));
-        when(leaseRepository.countDistinctTenantsByOwnerIdAndStatus(4L, Constants.LEASE_ACTIVE)).thenReturn(0L);
+        when(userRepository.findById(4L)).thenReturn(Optional.of(user(4L, UserRole.OWNER)));
+        when(leaseRepository.countDistinctTenantsByOwnerIdAndStatus(4L, LeaseStatus.ACTIVE)).thenReturn(0L);
         when(rentPaymentRepository.sumOutstandingByOwnerIdAndStatusIn(4L,
-                List.of(Constants.RENT_PENDING, Constants.RENT_LATE, Constants.RENT_AWAITING_APPROVAL)))
+                List.of(RentStatus.PENDING, RentStatus.LATE, RentStatus.AWAITING_APPROVAL)))
                 .thenReturn(null);
         when(maintenanceRequestRepository.countByProperty_OwnerIdAndStatusIn(4L,
-                List.of(Constants.MAINTENANCE_OPEN, Constants.MAINTENANCE_IN_PROGRESS))).thenReturn(0L);
+                List.of(MaintenanceStatus.OPEN, MaintenanceStatus.IN_PROGRESS))).thenReturn(0L);
 
         var dashboard = dashboardService.getOwnerDashboard(4L);
 
@@ -73,13 +76,13 @@ class DashboardServiceTest {
 
     @Test
     void tenantCannotReadOwnerDashboard() {
-        when(userRepository.findById(7L)).thenReturn(Optional.of(user(7L, Constants.ROLE_TENANT)));
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user(7L, UserRole.TENANT)));
 
         assertThrows(ResponseStatusException.class, () -> dashboardService.getOwnerDashboard(7L));
-        verify(leaseRepository, never()).countDistinctTenantsByOwnerIdAndStatus(7L, Constants.LEASE_ACTIVE);
+        verify(leaseRepository, never()).countDistinctTenantsByOwnerIdAndStatus(7L, LeaseStatus.ACTIVE);
     }
 
-    private User user(Long id, String role) {
+    private User user(Long id, UserRole role) {
         User user = new User();
         user.setId(id);
         user.setRole(role);

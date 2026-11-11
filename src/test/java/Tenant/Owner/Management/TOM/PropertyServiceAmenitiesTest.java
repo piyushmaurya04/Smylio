@@ -8,6 +8,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -17,10 +20,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import Tenant.Owner.Management.TOM.Constants.PropertyStatus;
 import Tenant.Owner.Management.TOM.DTO.PropertyRequest;
 import Tenant.Owner.Management.TOM.Entity.Property;
+import Tenant.Owner.Management.TOM.Repository.LeaseRepository;
+import Tenant.Owner.Management.TOM.Repository.MaintenanceRequestRepository;
+import Tenant.Owner.Management.TOM.Repository.NoticeRepository;
 import Tenant.Owner.Management.TOM.Repository.PropertyRepository;
 import Tenant.Owner.Management.TOM.Service.PropertyService;
 
@@ -28,6 +36,14 @@ import Tenant.Owner.Management.TOM.Service.PropertyService;
 class PropertyServiceAmenitiesTest {
     @Mock
     private PropertyRepository propertyRepository;
+    @Mock
+    private LeaseRepository leaseRepository;
+    @Mock
+    private MaintenanceRequestRepository maintenanceRequestRepository;
+    @Mock
+    private NoticeRepository noticeRepository;
+    @Spy
+    private Clock clock = Clock.fixed(Instant.parse("2026-03-15T04:30:00Z"), ZoneId.of("Asia/Kolkata"));
 
     @InjectMocks
     private PropertyService propertyService;
@@ -70,6 +86,18 @@ class PropertyServiceAmenitiesTest {
         assertThrows(IllegalArgumentException.class, () -> propertyService.create(blank, 4L));
         assertThrows(IllegalArgumentException.class, () -> propertyService.create(overlong, 4L));
         verify(propertyRepository, never()).save(any(Property.class));
+    }
+
+    @Test
+    void deleteRejectsPropertyWithExistingLeaseHistory() {
+        Property property = new Property();
+        property.setId(12L);
+        property.setStatus(PropertyStatus.AVAILABLE);
+        when(propertyRepository.findByIdAndOwnerId(12L, 4L)).thenReturn(Optional.of(property));
+        when(leaseRepository.existsByPropertyId(12L)).thenReturn(true);
+
+        assertThrows(IllegalStateException.class, () -> propertyService.deleteProperty(12L, 4L));
+        verify(propertyRepository, never()).delete(any(Property.class));
     }
 
     private PropertyRequest request(List<String> amenities) {

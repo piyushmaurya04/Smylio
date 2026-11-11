@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.Map;
 import java.util.UUID;
 
+import jakarta.servlet.http.Cookie;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -21,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import Tenant.Owner.Management.TOM.Constants.UserRole;
 import Tenant.Owner.Management.TOM.Entity.User;
 import Tenant.Owner.Management.TOM.Repository.UserRepository;
 
@@ -232,7 +235,12 @@ class SecurityIntegrationTest {
                 .param("code", tenant.getTenantCode())
                 .header("Authorization", "Bearer " + ownerToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(tenantId))
+                .andExpect(jsonPath("$.name").value("Security Test User"))
+                .andExpect(jsonPath("$.maskedPhone").value("******0100"))
+                .andExpect(jsonPath("$.tenantCode").value(tenant.getTenantCode()))
+                .andExpect(jsonPath("$.id").doesNotExist())
+                .andExpect(jsonPath("$.email").doesNotExist())
+                .andExpect(jsonPath("$.phone").doesNotExist())
                 .andExpect(jsonPath("$.password").doesNotExist());
 
         mockMvc.perform(get("/api/tenants/search")
@@ -317,17 +325,15 @@ class SecurityIntegrationTest {
         legacyUser.setEmail(legacyEmail);
         legacyUser.setPassword(password);
         legacyUser.setPhone("5550100100");
-        legacyUser.setRole("OWNER");
+        legacyUser.setRole(UserRole.OWNER);
         legacyUser.setCreatedAt(java.time.LocalDateTime.now());
-        legacyUser = userRepository.saveAndFlush(legacyUser);
+        userRepository.saveAndFlush(legacyUser);
 
-        String legacyToken = login(legacyEmail, password);
-        User migratedUser = userRepository.findById(legacyUser.getId()).orElseThrow();
-        org.junit.jupiter.api.Assertions.assertTrue(passwordEncoder.matches(password, migratedUser.getPassword()));
-        org.junit.jupiter.api.Assertions.assertNotEquals(password, migratedUser.getPassword());
-        mockMvc.perform(get("/api/properties")
-                .header("Authorization", "Bearer " + legacyToken))
-                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("email", legacyEmail, "password", password))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid email or password"));
     }
 
     @Test
@@ -434,6 +440,50 @@ class SecurityIntegrationTest {
                 .andExpect(jsonPath("$.totalElements").value(0));
     }
 
+    @Test
+    void refreshRotatesHttpOnlyCookieDetectsReuseAndLogoutRevokesSession() throws Exception {
+        String email = "refresh-flow-" + UUID.randomUUID() + "@example.test";
+        String password = "SecurePass123!";
+        register(email, password, "TENANT");
+
+        var loginResult = mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("email", email, "password", password))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.expiresIn").value(900))
+                .andReturn();
+        Cookie initialCookie = loginResult.getResponse().getCookie("smylio_refresh");
+        org.junit.jupiter.api.Assertions.assertNotNull(initialCookie);
+        org.junit.jupiter.api.Assertions.assertTrue(initialCookie.isHttpOnly());
+
+        var refreshResult = mockMvc.perform(post("/api/auth/refresh").cookie(initialCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.expiresIn").value(900))
+                .andReturn();
+        Cookie rotatedCookie = refreshResult.getResponse().getCookie("smylio_refresh");
+        org.junit.jupiter.api.Assertions.assertNotNull(rotatedCookie);
+        org.junit.jupiter.api.Assertions.assertNotEquals(initialCookie.getValue(), rotatedCookie.getValue());
+
+        // Replaying the old cookie detects reuse and revokes the entire token family
+        mockMvc.perform(post("/api/auth/refresh").cookie(initialCookie))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/auth/refresh").cookie(rotatedCookie))
+                .andExpect(status().isUnauthorized());
+
+        // Fresh login then logout revokes session cleanly
+        var secondLogin = mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("email", email, "password", password))))
+                .andExpect(status().isOk())
+                .andReturn();
+        Cookie secondCookie = secondLogin.getResponse().getCookie("smylio_refresh");
+        mockMvc.perform(post("/api/auth/logout").cookie(secondCookie))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(post("/api/auth/refresh").cookie(secondCookie))
+                .andExpect(status().isUnauthorized());
+    }
+
     private long register(String email, String password, String role) throws Exception {
         String body = objectMapper.writeValueAsString(Map.of(
                 "name", "Security Test User",
@@ -458,7 +508,7 @@ class SecurityIntegrationTest {
                 .content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
-                .andExpect(jsonPath("$.expiresIn").value(86400))
+                .andExpect(jsonPath("$.expiresIn").value(900))
                 .andReturn().getResponse().getContentAsString();
         return objectMapper.readTree(response).get("accessToken").asText();
     }

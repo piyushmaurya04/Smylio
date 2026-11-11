@@ -4,6 +4,7 @@ import type { User } from './types'
 export interface AuthState {
   token: string | null
   user: User | null
+  initializing: boolean
   signIn: (email: string, password: string) => Promise<void>
   signUp: (input: { name: string; email: string; password: string; phone: string; role: User['role'] }) => Promise<void>
   updateUser: (user: User) => void

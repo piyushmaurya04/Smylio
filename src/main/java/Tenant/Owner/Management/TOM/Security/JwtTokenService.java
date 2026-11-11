@@ -1,5 +1,6 @@
 package Tenant.Owner.Management.TOM.Security;
 
+import java.time.Clock;
 import java.time.Instant;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -16,21 +17,24 @@ import Tenant.Owner.Management.TOM.Entity.User;
 public class JwtTokenService {
     private final JwtEncoder jwtEncoder;
     private final long expirationSeconds;
+    private final Clock clock;
 
     public JwtTokenService(JwtEncoder jwtEncoder,
-            @Value("${app.security.jwt.expiration-seconds:86400}") long expirationSeconds) {
+            @Value("${app.security.jwt.expiration-seconds:86400}") long expirationSeconds,
+            Clock clock) {
         this.jwtEncoder = jwtEncoder;
         this.expirationSeconds = expirationSeconds;
+        this.clock = clock;
     }
 
     public String createToken(User user) {
-        Instant issuedAt = Instant.now();
+        Instant issuedAt = Instant.now(clock);
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer("tom-api")
                 .issuedAt(issuedAt)
                 .expiresAt(issuedAt.plusSeconds(expirationSeconds))
                 .subject(user.getId().toString())
-                .claim("role", user.getRole())
+                .claim("role", user.getRole().name())
                 .claim("email", user.getEmail())
                 .build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();

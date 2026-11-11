@@ -1,5 +1,6 @@
 package Tenant.Owner.Management.TOM.Service;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -13,7 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import Tenant.Owner.Management.TOM.Constants.Constants;
+import Tenant.Owner.Management.TOM.Constants.LeaseStatus;
+import Tenant.Owner.Management.TOM.Constants.UserRole;
 import Tenant.Owner.Management.TOM.DTO.NoticeCreateRequest;
 import Tenant.Owner.Management.TOM.DTO.NoticeResponse;
 import Tenant.Owner.Management.TOM.Entity.Notice;
@@ -29,12 +31,14 @@ public class NoticeService {
     private final NoticeRepository noticeRepository;
     private final PropertyRepository propertyRepository;
     private final UserRepository userRepository;
+    private final Clock clock;
 
     public NoticeService(NoticeRepository noticeRepository, PropertyRepository propertyRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository, Clock clock) {
         this.noticeRepository = noticeRepository;
         this.propertyRepository = propertyRepository;
         this.userRepository = userRepository;
+        this.clock = clock;
     }
 
     @Transactional
@@ -42,7 +46,7 @@ public class NoticeService {
         validateText(request.getTitle(), "title");
         validateText(request.getMessage(), "message");
         User owner = requireUser(ownerId);
-        requireRole(owner, Constants.ROLE_OWNER);
+        requireRole(owner, UserRole.OWNER);
 
         Property property = null;
         if (request.getPropertyId() != null) {
@@ -56,7 +60,7 @@ public class NoticeService {
         notice.setProperty(property);
         notice.setTitle(request.getTitle().trim());
         notice.setMessage(request.getMessage().trim());
-        notice.setCreatedAt(LocalDateTime.now());
+        notice.setCreatedAt(LocalDateTime.now(clock));
         return toResponse(noticeRepository.save(notice));
     }
 
@@ -68,14 +72,14 @@ public class NoticeService {
 
         if (ownerId != null) {
             User owner = requireUser(ownerId);
-            requireRole(owner, Constants.ROLE_OWNER);
+            requireRole(owner, UserRole.OWNER);
             return noticeRepository.findByOwner_IdOrderByCreatedAtDesc(ownerId)
                     .stream().map(this::toResponse).toList();
         }
 
         User tenant = requireUser(tenantId);
-        requireRole(tenant, Constants.ROLE_TENANT);
-        return noticeRepository.findVisibleToTenant(tenantId, Constants.LEASE_ACTIVE)
+        requireRole(tenant, UserRole.TENANT);
+        return noticeRepository.findVisibleToTenant(tenantId, LeaseStatus.ACTIVE)
                 .stream().map(this::toResponse).toList();
     }
 
@@ -88,7 +92,7 @@ public class NoticeService {
 
         if (ownerId != null) {
             User owner = requireUser(ownerId);
-            requireRole(owner, Constants.ROLE_OWNER);
+            requireRole(owner, UserRole.OWNER);
             String searchTerm = search == null || search.isBlank() ? "" : search.trim();
             Page<NoticeResponse> result = noticeRepository
                     .findByOwnerWithFilters(ownerId, searchTerm, propertyId, pageable)
@@ -99,10 +103,10 @@ public class NoticeService {
         }
 
         User tenant = requireUser(tenantId);
-        requireRole(tenant, Constants.ROLE_TENANT);
+        requireRole(tenant, UserRole.TENANT);
         String searchTerm = search == null || search.isBlank() ? "" : search.trim();
         Page<NoticeResponse> result = noticeRepository
-                .findVisibleToTenant(tenantId, Constants.LEASE_ACTIVE, searchTerm, propertyId, pageable)
+                .findVisibleToTenant(tenantId, LeaseStatus.ACTIVE, searchTerm, propertyId, pageable)
                 .map(this::toResponse);
         logger.info("Notice tenant query completed: tenantId={} page={} totalElements={}",
                 tenantId, pageable.getPageNumber(), result.getTotalElements());
@@ -114,7 +118,7 @@ public class NoticeService {
         validateText(request.getTitle(), "title");
         validateText(request.getMessage(), "message");
         User owner = requireUser(ownerId);
-        requireRole(owner, Constants.ROLE_OWNER);
+        requireRole(owner, UserRole.OWNER);
         Notice notice = noticeRepository.findByIdAndOwner_Id(noticeId, ownerId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notice not found"));
 
@@ -134,7 +138,7 @@ public class NoticeService {
     @Transactional
     public void delete(Long noticeId, Long ownerId) {
         User owner = requireUser(ownerId);
-        requireRole(owner, Constants.ROLE_OWNER);
+        requireRole(owner, UserRole.OWNER);
         Notice notice = noticeRepository.findByIdAndOwner_Id(noticeId, ownerId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notice not found"));
         noticeRepository.delete(notice);
@@ -145,8 +149,8 @@ public class NoticeService {
                 .orElseThrow(() -> new NoSuchElementException("User not found: " + userId));
     }
 
-    private void requireRole(User user, String requiredRole) {
-        if (!requiredRole.equals(user.getRole())) {
+    private void requireRole(User user, UserRole requiredRole) {
+        if (requiredRole != user.getRole()) {
             logger.warn("Notice access role mismatch: userId={} actualRole={} requiredRole={}",
                     user.getId(), user.getRole(), requiredRole);
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,

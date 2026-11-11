@@ -13,7 +13,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import Tenant.Owner.Management.TOM.Constants.Constants;
+import Tenant.Owner.Management.TOM.Constants.UserRole;
 import Tenant.Owner.Management.TOM.Entity.User;
 import Tenant.Owner.Management.TOM.Repository.UserRepository;
 import Tenant.Owner.Management.TOM.Service.TenantService;
@@ -27,22 +27,23 @@ class TenantServiceTest {
     private TenantService tenantService;
 
     @Test
-    void searchesTenantUsingTrimmedCaseInsensitiveCodeAndReturnsSafeDto() {
+    void searchesTenantUsingTrimmedCaseInsensitiveCodeAndReturnsMaskedDto() {
         User tenant = new User();
         tenant.setId(12L);
         tenant.setName("Jordan Tenant");
         tenant.setEmail("jordan@example.test");
-        tenant.setRole(Constants.ROLE_TENANT);
-        tenant.setTenantCode("TNT-12");
+        tenant.setPhone("9876543210");
+        tenant.setRole(UserRole.TENANT);
+        tenant.setTenantCode("TNT-8K3P9M2W");
         tenant.setPassword("must-not-be-returned");
-        when(userRepository.findByTenantCode("TNT-12")).thenReturn(Optional.of(tenant));
+        when(userRepository.findByTenantCode("TNT-8K3P9M2W")).thenReturn(Optional.of(tenant));
 
-        var response = tenantService.findByTenantCode(" tnt-12 ");
+        var response = tenantService.findByTenantCode(" tnt-8k3p9m2w ");
 
-        assertEquals(12L, response.getId());
-        assertEquals("TNT-12", response.getTenantCode());
-        assertEquals(Constants.ROLE_TENANT, response.getRole());
-        verify(userRepository).findByTenantCode("TNT-12");
+        assertEquals("Jordan Tenant", response.getName());
+        assertEquals("******3210", response.getMaskedPhone());
+        assertEquals("TNT-8K3P9M2W", response.getTenantCode());
+        verify(userRepository).findByTenantCode("TNT-8K3P9M2W");
     }
 
     @Test
@@ -54,7 +55,7 @@ class TenantServiceTest {
     void doesNotReturnOwnerEvenIfRepositoryReturnsOne() {
         User owner = new User();
         owner.setTenantCode("TNT-1");
-        owner.setRole(Constants.ROLE_OWNER);
+        owner.setRole(UserRole.OWNER);
         when(userRepository.findByTenantCode("TNT-1")).thenReturn(Optional.of(owner));
 
         assertThrows(java.util.NoSuchElementException.class,

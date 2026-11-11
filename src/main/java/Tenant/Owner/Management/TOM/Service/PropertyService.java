@@ -1,5 +1,6 @@
 package Tenant.Owner.Management.TOM.Service;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -10,20 +11,34 @@ import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import Tenant.Owner.Management.TOM.Constants.Constants;
+import Tenant.Owner.Management.TOM.Constants.PropertyStatus;
 import Tenant.Owner.Management.TOM.DTO.PropertyRequest;
 import Tenant.Owner.Management.TOM.DTO.PropertyResponse;
 import Tenant.Owner.Management.TOM.Entity.Property;
+import Tenant.Owner.Management.TOM.Repository.LeaseRepository;
+import Tenant.Owner.Management.TOM.Repository.MaintenanceRequestRepository;
+import Tenant.Owner.Management.TOM.Repository.NoticeRepository;
 import Tenant.Owner.Management.TOM.Repository.PropertyRepository;
 
 @Service
 public class PropertyService {
 
    private final PropertyRepository propertyRepository;
-   private static final String STATUS_AVAILABLE = Constants.STATUS_AVAILABLE;
+   private final LeaseRepository leaseRepository;
+   private final MaintenanceRequestRepository maintenanceRequestRepository;
+   private final NoticeRepository noticeRepository;
+   private final Clock clock;
 
-   public PropertyService(PropertyRepository propertyRepository) {
+   public PropertyService(PropertyRepository propertyRepository,
+         LeaseRepository leaseRepository,
+         MaintenanceRequestRepository maintenanceRequestRepository,
+         NoticeRepository noticeRepository,
+         Clock clock) {
       this.propertyRepository = propertyRepository;
+      this.leaseRepository = leaseRepository;
+      this.maintenanceRequestRepository = maintenanceRequestRepository;
+      this.noticeRepository = noticeRepository;
+      this.clock = clock;
    }
 
    @Transactional
@@ -34,8 +49,8 @@ public class PropertyService {
       property.setRentAmount(request.getRentAmount());
       property.setDescription(request.getDescription());
       property.setType(request.getType());
-      property.setCreatedAt(LocalDateTime.now());
-      property.setStatus(STATUS_AVAILABLE);
+      property.setCreatedAt(LocalDateTime.now(clock));
+      property.setStatus(PropertyStatus.AVAILABLE);
       property.setOwnerId(ownerId);
       property.setAmenities(normalizeAmenities(request.getAmenities()));
 
@@ -53,7 +68,7 @@ public class PropertyService {
       propertyResponse.setRentAmount(property.getRentAmount());
       propertyResponse.setDescription(property.getDescription());
       propertyResponse.setType(property.getType());
-      propertyResponse.setStatus(property.getStatus());
+      propertyResponse.setStatus(property.getStatus() != null ? property.getStatus().name() : null);
       propertyResponse.setCreatedAt(property.getCreatedAt());
       propertyResponse.setAmenities(property.getAmenities().stream()
             .sorted(String.CASE_INSENSITIVE_ORDER).toList());
@@ -94,9 +109,14 @@ public class PropertyService {
    public void deleteProperty(long id, Long ownerId) {
       Property property = propertyRepository.findByIdAndOwnerId(id, ownerId)
             .orElseThrow(() -> new java.util.NoSuchElementException("Property Not Found " + id));
-      if (property != null) {
-         propertyRepository.delete(property);
+      if (PropertyStatus.OCCUPIED == property.getStatus()
+            || leaseRepository.existsByPropertyId(id)
+            || maintenanceRequestRepository.existsByPropertyId(id)
+            || noticeRepository.existsByProperty_Id(id)) {
+         throw new IllegalStateException(
+               "Property has existing leases, maintenance requests, or notices and cannot be deleted");
       }
+      propertyRepository.delete(property);
 
    }
 

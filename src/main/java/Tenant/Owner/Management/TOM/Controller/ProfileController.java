@@ -1,5 +1,7 @@
 package Tenant.Owner.Management.TOM.Controller;
 
+import jakarta.validation.Valid;
+
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,7 +31,7 @@ public class ProfileController {
 
     @PutMapping
     public UserResponse updateProfile(
-            @RequestBody ProfileUpdateRequest request,
+            @Valid @RequestBody ProfileUpdateRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         return userService.updateProfile(JwtPrincipal.userId(jwt), request);
     }

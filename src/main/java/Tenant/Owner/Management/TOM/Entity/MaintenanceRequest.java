@@ -2,8 +2,12 @@ package Tenant.Owner.Management.TOM.Entity;
 
 import java.time.LocalDateTime;
 
+import Tenant.Owner.Management.TOM.Constants.MaintenancePriority;
+import Tenant.Owner.Management.TOM.Constants.MaintenanceStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -32,8 +36,11 @@ public class MaintenanceRequest {
     private User tenant;
     private String title;
     private String description;
-    private String priority;
-    private String status;
+    @Enumerated(EnumType.STRING)
+    private MaintenancePriority priority;
+
+    @Enumerated(EnumType.STRING)
+    private MaintenanceStatus status;
     @Column(name = "created_at")
     private LocalDateTime createdAt;
     @Column(name = "resolved_at")

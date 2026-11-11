@@ -16,7 +16,7 @@ import {
   Wrench,
 } from 'lucide-react'
 import { useAuth } from './auth-context'
-import { ConfirmationDialog } from './components'
+import { ConfirmationDialog, LoadingState } from './components'
 import { AuthPage, DashboardPage, LeasesPage, MaintenanceDetailPage, MaintenancePage, NoticeDetailPage, NoticesPage, OwnerTenantDetailPage, ProfilePage, PropertiesPage, RentPage, TenantLeaseDetailPage } from './pages'
 import { FaqPage } from './faq'
 
@@ -123,8 +123,12 @@ function DefaultRoute() {
 }
 
 function App() {
-  const { user } = useAuth()
+  const { user, initializing } = useAuth()
   const defaultPage = user?.role === 'OWNER' ? '/owner/overview' : '/tenant/overview'
+
+  if (initializing) {
+    return <main className="page-content"><LoadingState label="Restoring session…" /></main>
+  }
 
   return (
     <Routes>

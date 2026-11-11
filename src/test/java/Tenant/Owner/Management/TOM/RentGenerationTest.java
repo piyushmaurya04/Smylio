@@ -6,16 +6,20 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import Tenant.Owner.Management.TOM.Constants.Constants;
+import Tenant.Owner.Management.TOM.Constants.LeaseStatus;
 import Tenant.Owner.Management.TOM.Entity.Lease;
 import Tenant.Owner.Management.TOM.Repository.LeaseRepository;
 import Tenant.Owner.Management.TOM.Repository.RentPaymentRepository;
@@ -30,13 +34,15 @@ class RentGenerationTest {
     private LeaseRepository leaseRepository;
     @Mock
     private UserRepository userRepository;
+    @Spy
+    private Clock clock = Clock.fixed(Instant.parse("2026-03-15T04:30:00Z"), ZoneId.of("Asia/Kolkata"));
 
     @InjectMocks
     private RentService rentService;
 
     @Test
     void generatesRentWhenMonthlyDueDateHasArrived() {
-        Lease lease = lease(LocalDate.now().minusMonths(1));
+        Lease lease = lease(LocalDate.now(clock).minusMonths(1));
         when(rentPaymentRepository.existsByLeaseIdAndForMonth(12L,
                 lease.getStartDate().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"))))
                 .thenReturn(false);
@@ -49,7 +55,7 @@ class RentGenerationTest {
 
     @Test
     void doesNotGenerateRentBeforeFirstMonthlyDueDate() {
-        Lease lease = lease(LocalDate.now());
+        Lease lease = lease(LocalDate.now(clock));
 
         int created = rentService.generateRentForLease(lease);
 
@@ -59,8 +65,8 @@ class RentGenerationTest {
 
     @Test
     void generationResultDistinguishesCheckedLeasesFromCreatedRentRecords() {
-        Lease lease = lease(LocalDate.now());
-        when(leaseRepository.findByStatus(Constants.LEASE_ACTIVE)).thenReturn(List.of(lease));
+        Lease lease = lease(LocalDate.now(clock));
+        when(leaseRepository.findByStatus(LeaseStatus.ACTIVE)).thenReturn(List.of(lease));
         when(rentPaymentRepository.findByLeaseIdOrderByDueDateDesc(12L)).thenReturn(List.of());
 
         RentService.RentGenerationResult result = rentService.runDailyRentJob();
@@ -72,8 +78,8 @@ class RentGenerationTest {
     @Test
     void ownerGenerationChecksOnlyThatOwnersActiveLeases() {
         long ownerId = 24L;
-        Lease ownerLease = lease(LocalDate.now());
-        when(leaseRepository.findByProperty_OwnerIdAndStatus(ownerId, Constants.LEASE_ACTIVE))
+        Lease ownerLease = lease(LocalDate.now(clock));
+        when(leaseRepository.findByProperty_OwnerIdAndStatus(ownerId, LeaseStatus.ACTIVE))
                 .thenReturn(List.of(ownerLease));
         when(rentPaymentRepository.findByLeaseIdOrderByDueDateDesc(12L)).thenReturn(List.of());
 
@@ -81,8 +87,8 @@ class RentGenerationTest {
 
         assertEquals(1, result.leasesChecked());
         assertEquals(0, result.rentRecordsCreated());
-        verify(leaseRepository).findByProperty_OwnerIdAndStatus(ownerId, Constants.LEASE_ACTIVE);
-        verify(leaseRepository, never()).findByStatus(Constants.LEASE_ACTIVE);
+        verify(leaseRepository).findByProperty_OwnerIdAndStatus(ownerId, LeaseStatus.ACTIVE);
+        verify(leaseRepository, never()).findByStatus(LeaseStatus.ACTIVE);
     }
 
     private Lease lease(LocalDate startDate) {

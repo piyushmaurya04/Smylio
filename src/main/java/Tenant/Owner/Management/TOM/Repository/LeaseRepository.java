@@ -7,11 +7,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import Tenant.Owner.Management.TOM.Constants.LeaseStatus;
 import Tenant.Owner.Management.TOM.Entity.Lease;
 
 public interface LeaseRepository extends JpaRepository<Lease, Long> {
 
-    boolean existsByPropertyIdAndStatus(Long propertyId, String status);
+    boolean existsByPropertyIdAndStatus(Long propertyId, LeaseStatus status);
+
+    boolean existsByPropertyId(Long propertyId);
 
     List<Lease> findByProperty_OwnerId(Long ownerId);
 
@@ -23,9 +26,9 @@ public interface LeaseRepository extends JpaRepository<Lease, Long> {
 
     List<Lease> findByTenantId(Long tenantId);
 
-    List<Lease> findByProperty_OwnerIdAndStatus(Long ownerId, String status);
+    List<Lease> findByProperty_OwnerIdAndStatus(Long ownerId, LeaseStatus status);
 
-    boolean existsByPropertyIdAndTenantIdAndStatus(Long propertyId, Long tenantId, String status);
+    boolean existsByPropertyIdAndTenantIdAndStatus(Long propertyId, Long tenantId, LeaseStatus status);
 
     @Query("SELECT DISTINCT l FROM Lease l " +
             "JOIN FETCH l.property p " +
@@ -49,12 +52,12 @@ public interface LeaseRepository extends JpaRepository<Lease, Long> {
             "LEFT JOIN FETCH p.amenities " +
             "WHERE l.tenant.id = :tenantId AND l.status = :status")
     List<Lease> findTenantLeasesWithDetails(@Param("tenantId") Long tenantId,
-            @Param("status") String status);
+            @Param("status") LeaseStatus status);
 
-    List<Lease> findByStatus(String status);
+    List<Lease> findByStatus(LeaseStatus status);
 
     @Query("SELECT COUNT(DISTINCT l.tenant.id) FROM Lease l " +
             "WHERE l.property.ownerId = :ownerId AND l.status = :status")
     long countDistinctTenantsByOwnerIdAndStatus(@Param("ownerId") Long ownerId,
-            @Param("status") String status);
+            @Param("status") LeaseStatus status);
 }

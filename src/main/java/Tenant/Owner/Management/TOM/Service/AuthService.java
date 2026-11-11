@@ -1,7 +1,6 @@
 package Tenant.Owner.Management.TOM.Service;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
+import java.util.Locale;
 import java.util.regex.Pattern;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,6 +18,9 @@ import Tenant.Owner.Management.TOM.Security.JwtTokenService;
 public class AuthService {
     private static final String INVALID_CREDENTIALS = "Invalid email or password";
     private static final Pattern BCRYPT_HASH = Pattern.compile("^\\$2[aby]\\$\\d{2}\\$[./A-Za-z0-9]{53}$");
+    // Valid BCrypt cost-12 hash used to equalize response latency when an email is not found
+    private static final String DUMMY_BCRYPT_HASH =
+            "$2a$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -31,29 +33,29 @@ public class AuthService {
         this.jwtTokenService = jwtTokenService;
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
-        if (request.getEmail() == null || request.getPassword() == null) {
-            throw new BadCredentialsException(INVALID_CREDENTIALS);
-        }
-        User user = userRepository.findByEmail(request.getEmail().trim().toLowerCase(java.util.Locale.ROOT))
-                .orElseThrow(() -> new BadCredentialsException(INVALID_CREDENTIALS));
-
-        String storedPassword = user.getPassword();
-        boolean legacyPlaintext = !BCRYPT_HASH.matcher(storedPassword).matches();
-        boolean passwordMatches = legacyPlaintext
-                ? MessageDigest.isEqual(storedPassword.getBytes(StandardCharsets.UTF_8),
-                        request.getPassword().getBytes(StandardCharsets.UTF_8))
-                : passwordEncoder.matches(request.getPassword(), storedPassword);
-        if (!passwordMatches) {
+        if (request == null || request.getEmail() == null || request.getPassword() == null) {
+            passwordEncoder.matches("dummy-password", DUMMY_BCRYPT_HASH);
             throw new BadCredentialsException(INVALID_CREDENTIALS);
         }
 
-        if (legacyPlaintext) {
-            user.setPassword(passwordEncoder.encode(request.getPassword()));
-            userRepository.save(user);
+        String normalizedEmail = request.getEmail().trim().toLowerCase(Locale.ROOT);
+        User user = userRepository.findByEmail(normalizedEmail).orElse(null);
+
+        if (user == null || user.getPassword() == null || !BCRYPT_HASH.matcher(user.getPassword()).matches()) {
+            passwordEncoder.matches(request.getPassword(), DUMMY_BCRYPT_HASH);
+            throw new BadCredentialsException(INVALID_CREDENTIALS);
         }
 
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new BadCredentialsException(INVALID_CREDENTIALS);
+        }
+
+        return buildAuthResponse(user);
+    }
+
+    public AuthResponse buildAuthResponse(User user) {
         AuthResponse response = new AuthResponse();
         response.setAccessToken(jwtTokenService.createToken(user));
         response.setTokenType("Bearer");
@@ -68,7 +70,7 @@ public class AuthService {
         response.setName(user.getName());
         response.setEmail(user.getEmail());
         response.setPhone(user.getPhone());
-        response.setRole(user.getRole());
+        response.setRole(user.getRole() != null ? user.getRole().name() : null);
         response.setTenantCode(user.getTenantCode());
         response.setCreatedAt(user.getCreatedAt());
         return response;

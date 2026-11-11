@@ -8,6 +8,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -16,13 +19,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.web.server.ResponseStatusException;
 
-import Tenant.Owner.Management.TOM.Constants.Constants;
+import Tenant.Owner.Management.TOM.Constants.LeaseStatus;
+import Tenant.Owner.Management.TOM.Constants.UserRole;
 import Tenant.Owner.Management.TOM.DTO.NoticeCreateRequest;
 import Tenant.Owner.Management.TOM.Entity.Notice;
 import Tenant.Owner.Management.TOM.Entity.User;
@@ -39,13 +44,15 @@ class NoticeServiceTest {
     private PropertyRepository propertyRepository;
     @Mock
     private UserRepository userRepository;
+    @Spy
+    private Clock clock = Clock.fixed(Instant.parse("2026-03-15T04:30:00Z"), ZoneId.of("Asia/Kolkata"));
 
     @InjectMocks
     private NoticeService noticeService;
 
     @Test
     void ownerCanCreateBroadcastNotice() {
-        User owner = user(4L, Constants.ROLE_OWNER);
+        User owner = user(4L, UserRole.OWNER);
         NoticeCreateRequest request = new NoticeCreateRequest();
         request.setTitle("Water shutoff");
         request.setMessage("Water will be unavailable tomorrow morning.");
@@ -70,7 +77,7 @@ class NoticeServiceTest {
         request.setPropertyId(8L);
         request.setTitle("Notice");
         request.setMessage("Message");
-        when(userRepository.findById(4L)).thenReturn(Optional.of(user(4L, Constants.ROLE_OWNER)));
+        when(userRepository.findById(4L)).thenReturn(Optional.of(user(4L, UserRole.OWNER)));
         when(propertyRepository.findByIdAndOwnerId(8L, 4L)).thenReturn(Optional.empty());
 
         assertThrows(java.util.NoSuchElementException.class, () -> noticeService.create(request, 4L));
@@ -79,24 +86,24 @@ class NoticeServiceTest {
 
     @Test
     void tenantReadsOnlyNoticesForActiveLeasedPropertiesAndTheirOwners() {
-        User tenant = user(7L, Constants.ROLE_TENANT);
+        User tenant = user(7L, UserRole.TENANT);
         Notice notice = new Notice();
-        notice.setOwner(user(4L, Constants.ROLE_OWNER));
+        notice.setOwner(user(4L, UserRole.OWNER));
         notice.setTitle("Building maintenance");
         notice.setMessage("Elevator maintenance Friday.");
         when(userRepository.findById(7L)).thenReturn(Optional.of(tenant));
-        when(noticeRepository.findVisibleToTenant(7L, Constants.LEASE_ACTIVE)).thenReturn(List.of(notice));
+        when(noticeRepository.findVisibleToTenant(7L, LeaseStatus.ACTIVE)).thenReturn(List.of(notice));
 
         var notices = noticeService.getNotices(null, 7L);
 
         assertEquals(1, notices.size());
         assertEquals("Building maintenance", notices.get(0).getTitle());
-        verify(noticeRepository).findVisibleToTenant(7L, Constants.LEASE_ACTIVE);
+        verify(noticeRepository).findVisibleToTenant(7L, LeaseStatus.ACTIVE);
     }
 
     @Test
     void ownerCanReadFilteredNoticePage() {
-        User owner = user(4L, Constants.ROLE_OWNER);
+        User owner = user(4L, UserRole.OWNER);
         var pageable = PageRequest.of(1, 5, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
         when(userRepository.findById(4L)).thenReturn(Optional.of(owner));
         when(noticeRepository.findByOwnerWithFilters(4L, "water", 8L, pageable))
@@ -112,30 +119,30 @@ class NoticeServiceTest {
 
     @Test
     void tenantCanReadPagedNoticesForActiveLeases() {
-        User tenant = user(7L, Constants.ROLE_TENANT);
+        User tenant = user(7L, UserRole.TENANT);
         var pageable = PageRequest.of(0, 5);
         when(userRepository.findById(7L)).thenReturn(Optional.of(tenant));
-        when(noticeRepository.findVisibleToTenant(7L, Constants.LEASE_ACTIVE, "", null, pageable))
+        when(noticeRepository.findVisibleToTenant(7L, LeaseStatus.ACTIVE, "", null, pageable))
                 .thenReturn(new PageImpl<>(Collections.emptyList(), pageable, 0));
 
         var result = noticeService.getNoticesPage(null, 7L, pageable, null, null);
 
         assertEquals(0, result.getTotalElements());
-        verify(noticeRepository).findVisibleToTenant(7L, Constants.LEASE_ACTIVE, "", null, pageable);
+        verify(noticeRepository).findVisibleToTenant(7L, LeaseStatus.ACTIVE, "", null, pageable);
     }
 
     @Test
     void tenantNoticePagePassesSearchAndPropertyFilters() {
-        User tenant = user(7L, Constants.ROLE_TENANT);
+        User tenant = user(7L, UserRole.TENANT);
         var pageable = PageRequest.of(0, 5);
         when(userRepository.findById(7L)).thenReturn(Optional.of(tenant));
-        when(noticeRepository.findVisibleToTenant(7L, Constants.LEASE_ACTIVE, "water", 8L, pageable))
+        when(noticeRepository.findVisibleToTenant(7L, LeaseStatus.ACTIVE, "water", 8L, pageable))
                 .thenReturn(new PageImpl<>(Collections.emptyList(), pageable, 0));
 
         var result = noticeService.getNoticesPage(null, 7L, pageable, " water ", 8L);
 
         assertEquals(0, result.getTotalElements());
-        verify(noticeRepository).findVisibleToTenant(7L, Constants.LEASE_ACTIVE, "water", 8L, pageable);
+        verify(noticeRepository).findVisibleToTenant(7L, LeaseStatus.ACTIVE, "water", 8L, pageable);
     }
 
     @Test
@@ -149,7 +156,7 @@ class NoticeServiceTest {
         NoticeCreateRequest request = new NoticeCreateRequest();
         request.setTitle("Notice");
         request.setMessage("Message");
-        when(userRepository.findById(7L)).thenReturn(Optional.of(user(7L, Constants.ROLE_TENANT)));
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user(7L, UserRole.TENANT)));
 
         assertThrows(ResponseStatusException.class, () -> noticeService.create(request, 7L));
         verify(noticeRepository, never()).save(any(Notice.class));
@@ -157,7 +164,7 @@ class NoticeServiceTest {
 
     @Test
     void ownerCanUpdateOwnNotice() {
-        User owner = user(4L, Constants.ROLE_OWNER);
+        User owner = user(4L, UserRole.OWNER);
         Notice notice = new Notice();
         notice.setId(10L);
         notice.setOwner(owner);
@@ -182,7 +189,7 @@ class NoticeServiceTest {
         NoticeCreateRequest request = new NoticeCreateRequest();
         request.setTitle("Updated title");
         request.setMessage("Updated message");
-        when(userRepository.findById(4L)).thenReturn(Optional.of(user(4L, Constants.ROLE_OWNER)));
+        when(userRepository.findById(4L)).thenReturn(Optional.of(user(4L, UserRole.OWNER)));
         when(noticeRepository.findByIdAndOwner_Id(10L, 4L)).thenReturn(Optional.empty());
 
         assertThrows(ResponseStatusException.class, () -> noticeService.update(10L, request, 4L));
@@ -195,7 +202,7 @@ class NoticeServiceTest {
         request.setTitle("Updated title");
         request.setMessage("Updated message");
         request.setPropertyId(8L);
-        when(userRepository.findById(4L)).thenReturn(Optional.of(user(4L, Constants.ROLE_OWNER)));
+        when(userRepository.findById(4L)).thenReturn(Optional.of(user(4L, UserRole.OWNER)));
         when(noticeRepository.findByIdAndOwner_Id(10L, 4L)).thenReturn(Optional.of(new Notice()));
         when(propertyRepository.findByIdAndOwnerId(8L, 4L)).thenReturn(Optional.empty());
 
@@ -208,7 +215,7 @@ class NoticeServiceTest {
         NoticeCreateRequest request = new NoticeCreateRequest();
         request.setTitle("Updated title");
         request.setMessage("Updated message");
-        when(userRepository.findById(7L)).thenReturn(Optional.of(user(7L, Constants.ROLE_TENANT)));
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user(7L, UserRole.TENANT)));
 
         assertThrows(ResponseStatusException.class, () -> noticeService.update(10L, request, 7L));
         verify(noticeRepository, never()).findByIdAndOwner_Id(10L, 7L);
@@ -217,7 +224,7 @@ class NoticeServiceTest {
 
     @Test
     void ownerCanDeleteOwnNotice() {
-        User owner = user(4L, Constants.ROLE_OWNER);
+        User owner = user(4L, UserRole.OWNER);
         Notice notice = new Notice();
         notice.setOwner(owner);
         when(userRepository.findById(4L)).thenReturn(Optional.of(owner));
@@ -230,7 +237,7 @@ class NoticeServiceTest {
 
     @Test
     void ownerCannotDeleteAnotherOwnersNotice() {
-        User owner = user(4L, Constants.ROLE_OWNER);
+        User owner = user(4L, UserRole.OWNER);
         when(userRepository.findById(4L)).thenReturn(Optional.of(owner));
         when(noticeRepository.findByIdAndOwner_Id(10L, 4L)).thenReturn(Optional.empty());
 
@@ -240,14 +247,14 @@ class NoticeServiceTest {
 
     @Test
     void tenantCannotDeleteNotice() {
-        when(userRepository.findById(7L)).thenReturn(Optional.of(user(7L, Constants.ROLE_TENANT)));
+        when(userRepository.findById(7L)).thenReturn(Optional.of(user(7L, UserRole.TENANT)));
 
         assertThrows(ResponseStatusException.class, () -> noticeService.delete(10L, 7L));
         verify(noticeRepository, never()).findByIdAndOwner_Id(10L, 7L);
         verify(noticeRepository, never()).delete(any(Notice.class));
     }
 
-    private User user(Long id, String role) {
+    private User user(Long id, UserRole role) {
         User user = new User();
         user.setId(id);
         user.setRole(role);

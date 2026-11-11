@@ -49,6 +49,12 @@ export interface Lease {
   status: 'ACTIVE' | 'ENDED'
 }
 
+export interface TenantSearchResult {
+  name: string
+  maskedPhone: string
+  tenantCode: string
+}
+
 export interface TenantDetails {
   id: number
   name: string
@@ -114,6 +120,7 @@ export interface MaintenanceComment {
   requestId: number
   userId: number
   userName: string
+  userRole?: Role
   comment: string
   createdAt: string
 }

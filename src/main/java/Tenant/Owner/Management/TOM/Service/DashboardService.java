@@ -9,7 +9,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import Tenant.Owner.Management.TOM.Constants.Constants;
+import Tenant.Owner.Management.TOM.Constants.LeaseStatus;
+import Tenant.Owner.Management.TOM.Constants.MaintenanceStatus;
+import Tenant.Owner.Management.TOM.Constants.RentStatus;
+import Tenant.Owner.Management.TOM.Constants.UserRole;
 import Tenant.Owner.Management.TOM.DTO.OwnerDashboardResponse;
 import Tenant.Owner.Management.TOM.Entity.User;
 import Tenant.Owner.Management.TOM.Repository.LeaseRepository;
@@ -37,18 +40,18 @@ public class DashboardService {
     public OwnerDashboardResponse getOwnerDashboard(Long ownerId) {
         User owner = userRepository.findById(ownerId)
                 .orElseThrow(() -> new NoSuchElementException("User not found: " + ownerId));
-        if (!Constants.ROLE_OWNER.equals(owner.getRole())) {
+        if (UserRole.OWNER != owner.getRole()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "This action is not allowed for this user role");
         }
 
         OwnerDashboardResponse response = new OwnerDashboardResponse();
         response.setTenantCount(leaseRepository.countDistinctTenantsByOwnerIdAndStatus(
-                ownerId, Constants.LEASE_ACTIVE));
+                ownerId, LeaseStatus.ACTIVE));
         response.setPendingRent(rentPaymentRepository.sumOutstandingByOwnerIdAndStatusIn(ownerId,
-                List.of(Constants.RENT_PENDING, Constants.RENT_LATE, Constants.RENT_AWAITING_APPROVAL)));
+                List.of(RentStatus.PENDING, RentStatus.LATE, RentStatus.AWAITING_APPROVAL)));
         response.setOpenMaintenanceCount(maintenanceRequestRepository.countByProperty_OwnerIdAndStatusIn(
-                ownerId, List.of(Constants.MAINTENANCE_OPEN, Constants.MAINTENANCE_IN_PROGRESS)));
+                ownerId, List.of(MaintenanceStatus.OPEN, MaintenanceStatus.IN_PROGRESS)));
         if (response.getPendingRent() == null) {
             response.setPendingRent(BigDecimal.ZERO);
         }
