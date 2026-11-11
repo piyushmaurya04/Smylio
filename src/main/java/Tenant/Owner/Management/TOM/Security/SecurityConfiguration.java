@@ -9,9 +9,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -31,6 +33,7 @@ public class SecurityConfiguration {
     private static final Logger logger = LoggerFactory.getLogger(SecurityConfiguration.class);
 
     @Bean
+    @ConditionalOnProperty(name = "app.cors.enabled", havingValue = "true")
     CorsConfigurationSource corsConfigurationSource(
             @Value("${app.cors.allowed-origins:http://localhost:5173}") String allowedOrigins) {
         CorsConfiguration cors = new CorsConfiguration();
@@ -38,7 +41,7 @@ public class SecurityConfiguration {
                 .map(String::trim).filter(origin -> !origin.isEmpty()).toList());
         cors.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         cors.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
-        cors.setAllowCredentials(false);
+        cors.setAllowCredentials(true);
         cors.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -52,20 +55,28 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http.csrf(AbstractHttpConfigurer::disable)
-                .cors(org.springframework.security.config.Customizer.withDefaults())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+    SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            @Value("${app.cors.enabled:false}") boolean corsEnabled) throws Exception {
+        http.csrf(AbstractHttpConfigurer::disable);
+        if (corsEnabled) {
+            http.cors(Customizer.withDefaults());
+        } else {
+            http.cors(AbstractHttpConfigurer::disable);
+        }
+        http.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exceptions -> exceptions
                         .accessDeniedHandler(accessDeniedHandler()))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
                                 "/", "/index.html", "/assets/**", "/favicon.ico",
                                 "/brand/**",
-                                "/login", "/register", "/profile", "/help",
+                                "/login", "/register", "/profile", "/faq", "/help",
                                 "/owner/**", "/tenant/**", "/actuator/health")
                         .permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout")
+                        .permitAll()
                         .requestMatchers("/api/auth/**").denyAll()
                         .requestMatchers("/api/profile/**").hasAnyRole("OWNER", "TENANT")
                         .requestMatchers("/api/properties/**").hasRole("OWNER")

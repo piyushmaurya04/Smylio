@@ -2,6 +2,8 @@ package Tenant.Owner.Management.TOM.Controller;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -38,7 +40,7 @@ public class NoticeController {
 
     @PostMapping
     public ResponseEntity<NoticeResponse> create(
-            @RequestBody NoticeCreateRequest request,
+            @Valid @RequestBody NoticeCreateRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         Long ownerId = JwtPrincipal.userId(jwt);
         return ResponseEntity.status(HttpStatus.CREATED).body(noticeService.create(request, ownerId));
@@ -55,7 +57,7 @@ public class NoticeController {
     @PutMapping("/{id}")
     public NoticeResponse update(
             @PathVariable Long id,
-            @RequestBody NoticeCreateRequest request,
+            @Valid @RequestBody NoticeCreateRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         Long ownerId = JwtPrincipal.userId(jwt);
         return noticeService.update(id, request, ownerId);

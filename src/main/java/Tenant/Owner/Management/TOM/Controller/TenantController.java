@@ -9,8 +9,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 import Tenant.Owner.Management.TOM.DTO.TenantDetailsResponse;
-import Tenant.Owner.Management.TOM.DTO.UserResponse;
+import Tenant.Owner.Management.TOM.DTO.TenantSearchResponse;
 import Tenant.Owner.Management.TOM.Security.JwtPrincipal;
+import Tenant.Owner.Management.TOM.Security.RateLimitService;
 import Tenant.Owner.Management.TOM.Service.TenantDetailsService;
 import Tenant.Owner.Management.TOM.Service.TenantService;
 
@@ -19,14 +20,21 @@ import Tenant.Owner.Management.TOM.Service.TenantService;
 public class TenantController {
     private final TenantService tenantService;
     private final TenantDetailsService tenantDetailsService;
+    private final RateLimitService rateLimitService;
 
-    public TenantController(TenantService tenantService, TenantDetailsService tenantDetailsService) {
+    public TenantController(TenantService tenantService,
+            TenantDetailsService tenantDetailsService,
+            RateLimitService rateLimitService) {
         this.tenantService = tenantService;
         this.tenantDetailsService = tenantDetailsService;
+        this.rateLimitService = rateLimitService;
     }
 
     @GetMapping("/search")
-    public UserResponse searchByTenantCode(@RequestParam String code) {
+    public TenantSearchResponse searchByTenantCode(
+            @RequestParam String code,
+            @AuthenticationPrincipal Jwt jwt) {
+        rateLimitService.consumeTenantSearch(JwtPrincipal.userId(jwt));
         return tenantService.findByTenantCode(code);
     }
 

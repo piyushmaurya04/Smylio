@@ -2,6 +2,8 @@ package Tenant.Owner.Management.TOM.Controller;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,7 +31,7 @@ public class LeaseController {
     }
 
     @PostMapping
-    public ResponseEntity<LeaseResponse> create(@RequestBody LeaseRequest leaseRequest,
+    public ResponseEntity<LeaseResponse> create(@Valid @RequestBody LeaseRequest leaseRequest,
             @AuthenticationPrincipal Jwt jwt) {
         Long ownerId = JwtPrincipal.userId(jwt);
         LeaseResponse response = leaseService.create(leaseRequest, ownerId);
@@ -44,7 +46,7 @@ public class LeaseController {
 
     @PutMapping("/{id}")
     public ResponseEntity<LeaseResponse> leaseUpdate(@PathVariable Long id,
-            @RequestBody LeaseRequest request,
+            @Valid @RequestBody LeaseRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         Long ownerId = JwtPrincipal.userId(jwt);
         LeaseResponse response = leaseService.leaseUpdate(id, request, ownerId);

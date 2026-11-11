@@ -7,6 +7,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Optional;
 import java.util.List;
 
@@ -14,12 +17,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.web.server.ResponseStatusException;
 
-import Tenant.Owner.Management.TOM.Constants.Constants;
+import Tenant.Owner.Management.TOM.Constants.LeaseStatus;
+import Tenant.Owner.Management.TOM.Constants.MaintenancePriority;
+import Tenant.Owner.Management.TOM.Constants.MaintenanceStatus;
+import Tenant.Owner.Management.TOM.Constants.UserRole;
 import Tenant.Owner.Management.TOM.DTO.MaintenanceRequestCreate;
 import Tenant.Owner.Management.TOM.DTO.MaintenanceRequestUpdate;
 import Tenant.Owner.Management.TOM.Entity.MaintenanceRequest;
@@ -44,6 +51,8 @@ class MaintenanceServiceTest {
     private PropertyRepository propertyRepository;
     @Mock
     private LeaseRepository leaseRepository;
+    @Spy
+    private Clock clock = Clock.fixed(Instant.parse("2026-03-15T04:30:00Z"), ZoneId.of("Asia/Kolkata"));
 
     @InjectMocks
     private MaintenanceService maintenanceService;
@@ -60,7 +69,7 @@ class MaintenanceServiceTest {
 
         when(userRepository.findById(7L)).thenReturn(Optional.of(tenant));
         when(propertyRepository.findById(3L)).thenReturn(Optional.of(property));
-        when(leaseRepository.existsByPropertyIdAndTenantIdAndStatus(3L, 7L, Constants.LEASE_ACTIVE))
+        when(leaseRepository.existsByPropertyIdAndTenantIdAndStatus(3L, 7L, LeaseStatus.ACTIVE))
                 .thenReturn(true);
         when(maintenanceRequestRepository.save(any(MaintenanceRequest.class))).thenAnswer(invocation -> {
             MaintenanceRequest request = invocation.getArgument(0);
@@ -74,7 +83,7 @@ class MaintenanceServiceTest {
         assertEquals(3L, response.getPropertyId());
         assertEquals(7L, response.getTenantId());
         assertEquals("HIGH", response.getPriority());
-        assertEquals(Constants.MAINTENANCE_OPEN, response.getStatus());
+        assertEquals(MaintenanceStatus.OPEN.name(), response.getStatus());
     }
 
     @Test
@@ -89,7 +98,7 @@ class MaintenanceServiceTest {
 
         when(userRepository.findById(7L)).thenReturn(Optional.of(tenant));
         when(propertyRepository.findById(3L)).thenReturn(Optional.of(property));
-        when(leaseRepository.existsByPropertyIdAndTenantIdAndStatus(3L, 7L, Constants.LEASE_ACTIVE))
+        when(leaseRepository.existsByPropertyIdAndTenantIdAndStatus(3L, 7L, LeaseStatus.ACTIVE))
                 .thenReturn(false);
 
         assertThrows(ResponseStatusException.class, () -> maintenanceService.raiseRequest(input, 7L));
@@ -100,16 +109,16 @@ class MaintenanceServiceTest {
     void updateStatusRejectsInvalidTransition() {
         User owner = new User();
         owner.setId(2L);
-        owner.setRole(Constants.ROLE_OWNER);
+        owner.setRole(UserRole.OWNER);
         MaintenanceRequest request = new MaintenanceRequest();
-        request.setStatus(Constants.MAINTENANCE_OPEN);
+        request.setStatus(MaintenanceStatus.OPEN);
 
         when(userRepository.findById(2L)).thenReturn(Optional.of(owner));
         when(maintenanceRequestRepository.findByIdAndProperty_OwnerId(11L, 2L))
                 .thenReturn(Optional.of(request));
 
         assertThrows(IllegalArgumentException.class,
-                () -> maintenanceService.updateStatus(11L, Constants.MAINTENANCE_OPEN, 2L));
+                () -> maintenanceService.updateStatus(11L, MaintenanceStatus.OPEN.name(), 2L));
         verify(maintenanceRequestRepository, never()).save(any(MaintenanceRequest.class));
     }
 
@@ -127,7 +136,7 @@ class MaintenanceServiceTest {
     void tenantCanUpdateOwnRequestDetailsWithoutChangingStatus() {
         User tenant = tenant(7L);
         MaintenanceRequest request = request(11L, property(3L), tenant(7L));
-        request.setStatus(Constants.MAINTENANCE_IN_PROGRESS);
+        request.setStatus(MaintenanceStatus.IN_PROGRESS);
         MaintenanceRequestUpdate update = new MaintenanceRequestUpdate();
         update.setTitle("  Fixed leak  ");
         update.setDescription("  Replaced the kitchen tap  ");
@@ -142,7 +151,7 @@ class MaintenanceServiceTest {
         assertEquals("Fixed leak", response.getTitle());
         assertEquals("Replaced the kitchen tap", response.getDescription());
         assertEquals("HIGH", response.getPriority());
-        assertEquals(Constants.MAINTENANCE_IN_PROGRESS, response.getStatus());
+        assertEquals(MaintenanceStatus.IN_PROGRESS.name(), response.getStatus());
     }
 
     @Test
@@ -163,7 +172,7 @@ class MaintenanceServiceTest {
     void tenantCannotEditResolvedRequest() {
         User tenant = tenant(7L);
         MaintenanceRequest request = request(11L, property(3L), tenant);
-        request.setStatus(Constants.MAINTENANCE_RESOLVED);
+        request.setStatus(MaintenanceStatus.RESOLVED);
         MaintenanceRequestUpdate update = new MaintenanceRequestUpdate();
         update.setTitle("Changed");
         update.setDescription("Changed");
@@ -177,6 +186,37 @@ class MaintenanceServiceTest {
     }
 
     @Test
+    void tenantCannotEditCancelledRequest() {
+        User tenant = tenant(7L);
+        MaintenanceRequest request = request(11L, property(3L), tenant);
+        request.setStatus(MaintenanceStatus.CANCELLED);
+        MaintenanceRequestUpdate update = new MaintenanceRequestUpdate();
+        update.setTitle("Changed");
+        update.setDescription("Changed");
+        update.setPriority("LOW");
+        when(userRepository.findById(7L)).thenReturn(Optional.of(tenant));
+        when(maintenanceRequestRepository.findByIdAndTenantId(11L, 7L)).thenReturn(Optional.of(request));
+
+        assertThrows(ResponseStatusException.class,
+                () -> maintenanceService.updateRequest(11L, update, 7L));
+        verify(maintenanceRequestRepository, never()).save(any(MaintenanceRequest.class));
+    }
+
+    @Test
+    void commentResponseIncludesAuthorRole() {
+        User owner = owner(2L);
+        MaintenanceRequest request = request(11L, property(3L), tenant(7L));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(owner));
+        when(maintenanceRequestRepository.findByIdAndProperty_OwnerId(11L, 2L))
+                .thenReturn(Optional.of(request));
+        when(maintenanceCommentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = maintenanceService.addComment(11L, "Plumber scheduled", 2L, null);
+
+        assertEquals(UserRole.OWNER.name(), response.getUserRole());
+    }
+
+    @Test
     void tenantCanCancelOwnOpenRequestWithoutDeletingIt() {
         User tenant = tenant(7L);
         MaintenanceRequest request = request(11L, property(3L), tenant(7L));
@@ -186,7 +226,7 @@ class MaintenanceServiceTest {
 
         var response = maintenanceService.cancelRequest(11L, 7L);
 
-        assertEquals(Constants.MAINTENANCE_CANCELLED, response.getStatus());
+        assertEquals(MaintenanceStatus.CANCELLED.name(), response.getStatus());
         verify(maintenanceRequestRepository).save(request);
         verify(maintenanceRequestRepository, never()).delete(any());
     }
@@ -195,7 +235,7 @@ class MaintenanceServiceTest {
     void tenantCannotCancelRequestAfterItLeavesOpenStatus() {
         User tenant = tenant(7L);
         MaintenanceRequest request = request(11L, property(3L), tenant);
-        request.setStatus(Constants.MAINTENANCE_IN_PROGRESS);
+        request.setStatus(MaintenanceStatus.IN_PROGRESS);
         when(userRepository.findById(7L)).thenReturn(Optional.of(tenant));
         when(maintenanceRequestRepository.findByIdAndTenantId(11L, 7L)).thenReturn(Optional.of(request));
 
@@ -223,7 +263,7 @@ class MaintenanceServiceTest {
         User owner = new User();
         owner.setId(id);
         owner.setName("Owner " + id);
-        owner.setRole(Constants.ROLE_OWNER);
+        owner.setRole(UserRole.OWNER);
         return owner;
     }
 
@@ -234,8 +274,8 @@ class MaintenanceServiceTest {
         request.setTenant(tenant);
         request.setTitle("Leaking tap");
         request.setDescription("Kitchen tap");
-        request.setPriority("MEDIUM");
-        request.setStatus(Constants.MAINTENANCE_OPEN);
+        request.setPriority(MaintenancePriority.MEDIUM);
+        request.setStatus(MaintenanceStatus.OPEN);
         return request;
     }
 
@@ -243,7 +283,7 @@ class MaintenanceServiceTest {
         User tenant = new User();
         tenant.setId(id);
         tenant.setName("Tenant " + id);
-        tenant.setRole(Constants.ROLE_TENANT);
+        tenant.setRole(UserRole.TENANT);
         return tenant;
     }
 

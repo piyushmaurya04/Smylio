@@ -9,9 +9,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import Tenant.Owner.Management.TOM.Constants.LeaseStatus;
 import Tenant.Owner.Management.TOM.Entity.Notice;
 
 public interface NoticeRepository extends JpaRepository<Notice, Long> {
+    boolean existsByProperty_Id(Long propertyId);
+
     List<Notice> findByOwner_IdOrderByCreatedAtDesc(Long ownerId);
 
     Optional<Notice> findByIdAndOwner_Id(Long id, Long ownerId);
@@ -38,7 +41,7 @@ public interface NoticeRepository extends JpaRepository<Notice, Long> {
             "WHERE l.tenant.id = :tenantId AND l.status = :leaseStatus)) " +
             "ORDER BY n.createdAt DESC")
     List<Notice> findVisibleToTenant(@Param("tenantId") Long tenantId,
-            @Param("leaseStatus") String leaseStatus);
+            @Param("leaseStatus") LeaseStatus leaseStatus);
 
     @Query(value = "SELECT n FROM Notice n LEFT JOIN n.property p " +
             "WHERE n.owner.id IN (SELECT l.property.ownerId FROM Lease l " +
@@ -57,7 +60,7 @@ public interface NoticeRepository extends JpaRepository<Notice, Long> {
                     "OR LOWER(COALESCE(p.title, '')) LIKE LOWER(CONCAT('%', :search, '%'))) " +
                     "AND (:propertyId IS NULL OR p.id = :propertyId)")
     Page<Notice> findVisibleToTenant(@Param("tenantId") Long tenantId,
-                    @Param("leaseStatus") String leaseStatus,
+                    @Param("leaseStatus") LeaseStatus leaseStatus,
                     @Param("search") String search,
                     @Param("propertyId") Long propertyId,
                     Pageable pageable);

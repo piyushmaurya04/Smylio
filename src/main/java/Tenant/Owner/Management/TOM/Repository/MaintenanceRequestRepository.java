@@ -7,14 +7,17 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import Tenant.Owner.Management.TOM.Constants.MaintenanceStatus;
 import Tenant.Owner.Management.TOM.Entity.MaintenanceRequest;
 
 public interface MaintenanceRequestRepository extends JpaRepository<MaintenanceRequest, Long> {
-    long countByProperty_OwnerIdAndStatusIn(Long ownerId, List<String> statuses);
+    long countByProperty_OwnerIdAndStatusIn(Long ownerId, List<MaintenanceStatus> statuses);
 
     long countByTenantIdAndProperty_OwnerId(Long tenantId, Long ownerId);
 
     long countByTenantIdAndPropertyIdAndProperty_OwnerId(Long tenantId, Long propertyId, Long ownerId);
+
+    boolean existsByPropertyId(Long propertyId);
 
     List<MaintenanceRequest> findByTenantId(Long tenantId);
 

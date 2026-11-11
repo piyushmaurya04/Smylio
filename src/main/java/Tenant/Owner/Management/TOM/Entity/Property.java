@@ -5,10 +5,13 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
+import Tenant.Owner.Management.TOM.Constants.PropertyStatus;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
@@ -39,7 +42,8 @@ public class Property {
     @Column(name = "rent_amount")
     private BigDecimal rentAmount;
 
-    private String status;
+    @Enumerated(EnumType.STRING)
+    private PropertyStatus status;
     private String description;
 
     @Column(name = "created_at")

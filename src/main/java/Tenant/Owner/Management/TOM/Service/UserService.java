@@ -1,5 +1,7 @@
 package Tenant.Owner.Management.TOM.Service;
 
+import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
@@ -13,18 +15,23 @@ import Tenant.Owner.Management.TOM.DTO.UserResponse;
 import Tenant.Owner.Management.TOM.Entity.User;
 import Tenant.Owner.Management.TOM.Repository.UserRepository;
 import org.springframework.transaction.annotation.Transactional;
-import Tenant.Owner.Management.TOM.Constants.Constants;
+import Tenant.Owner.Management.TOM.Constants.UserRole;
 
 @Service
 public class UserService {
+    private static final char[] CROCKFORD_BASE32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ".toCharArray();
+    private static final int TENANT_CODE_LENGTH = 8;
+    private static final int MAX_CODE_ATTEMPTS = 10;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    static final String ROLE_OWNER = Constants.ROLE_OWNER;
-    static final String ROLE_TENANTS = Constants.ROLE_TENANT;
+    private final Clock clock;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, Clock clock) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.clock = clock;
     }
 
     @Transactional
@@ -40,10 +47,11 @@ public class UserService {
             throw new IllegalArgumentException("Password must be 72 UTF-8 bytes or fewer");
         }
 
-        String role = request.getRole();
-        if (!ROLE_OWNER.equals(role) && !ROLE_TENANTS.equals(role)) {
-            throw new IllegalArgumentException("Invalid Role: " + role);
-
+        UserRole role;
+        try {
+            role = UserRole.valueOf(request.getRole());
+        } catch (IllegalArgumentException | NullPointerException ex) {
+            throw new IllegalArgumentException("Invalid Role: " + request.getRole());
         }
 
         String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
@@ -52,19 +60,35 @@ public class UserService {
         }
 
         User user = new User();
-        user.setName(request.getName());
+        user.setName(request.getName().trim());
         user.setEmail(email);
         user.setPhone(request.getPhone().trim());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(request.getRole());
-        user.setCreatedAt(LocalDateTime.now());
-        User saved = userRepository.save(user);
-
-        if (ROLE_TENANTS.equals(saved.getRole())) {
-            saved.setTenantCode("TNT-" + saved.getId());
-            saved = userRepository.save(saved);
+        user.setRole(role);
+        user.setCreatedAt(LocalDateTime.now(clock));
+        if (UserRole.TENANT == role) {
+            user.setTenantCode(generateUniqueTenantCode());
         }
+        User saved = userRepository.save(user);
         return toResponse(saved);
+    }
+
+    private String generateUniqueTenantCode() {
+        for (int attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
+            String candidate = randomTenantCode();
+            if (!userRepository.existsByTenantCode(candidate)) {
+                return candidate;
+            }
+        }
+        throw new IllegalStateException("Could not allocate a unique tenant code; please retry");
+    }
+
+    private String randomTenantCode() {
+        StringBuilder code = new StringBuilder(4 + TENANT_CODE_LENGTH).append("TNT-");
+        for (int i = 0; i < TENANT_CODE_LENGTH; i++) {
+            code.append(CROCKFORD_BASE32[SECURE_RANDOM.nextInt(CROCKFORD_BASE32.length)]);
+        }
+        return code.toString();
     }
 
     @Transactional(readOnly = true)
@@ -107,7 +131,7 @@ public class UserService {
         response.setName(user.getName());
         response.setEmail(user.getEmail());
         response.setPhone(user.getPhone());
-        response.setRole(user.getRole());
+        response.setRole(user.getRole() != null ? user.getRole().name() : null);
         response.setTenantCode(user.getTenantCode());
         response.setCreatedAt(user.getCreatedAt());
 

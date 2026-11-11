@@ -5,7 +5,7 @@ import { api, errorMessage } from './api'
 import { useAuth } from './auth-context'
 import { ConfirmationDialog, DataTable, EmptyState, Field, InlineError, InlineSuccess, LoadingState, Modal, PageHeading, Panel, StatCard, StatusBadge } from './components'
 import { formatCurrency, formatDate } from './format'
-import type { Lease, OwnerDashboard, Property, Rent, TenantDetails, User } from './types'
+import type { Lease, OwnerDashboard, Property, Rent, TenantDetails, TenantSearchResult } from './types'
 
 export function OwnerDashboardPage() {
   const { token } = useAuth()
@@ -159,7 +159,7 @@ export function OwnerLeasesPage() {
   const [notice, setNotice] = useState('')
   const [open, setOpen] = useState(false)
   const [code, setCode] = useState('')
-  const [tenant, setTenant] = useState<User | null>(null)
+  const [tenant, setTenant] = useState<TenantSearchResult | null>(null)
   const [form, setForm] = useState({ propertyId: '', startDate: '', monthlyRent: '', fineGraceDays: '5', finePerDay: '0' })
   const [busy, setBusy] = useState(false)
   const [leaseToEnd, setLeaseToEnd] = useState<Lease | null>(null)
@@ -205,7 +205,7 @@ export function OwnerLeasesPage() {
     {open && <Modal title="Assign a tenant" description="Tenant assignment creates an active lease." onClose={() => { setOpen(false); setTenant(null); setError('') }}>
       <form className="form-stack" onSubmit={assign} noValidate>
         <div className="field-group"><label htmlFor="tenant-code">Tenant code <span className="required-mark">*</span></label><div className="inline-field"><input id="tenant-code" value={code} onChange={(event) => { setCode(event.target.value); setTenant(null) }} placeholder="TNT-123" required /><button type="button" className="button" disabled={busy} onClick={() => void searchTenant()}><Search size={14} /> Find</button></div><span className="field-help">The tenant must have a registered account.</span></div>
-        {tenant && <div className="tenant-confirm"><span className="workspace-avatar">{tenant.name.slice(0, 1)}</span><div><strong>{tenant.name}</strong><small>{tenant.email} · {tenant.tenantCode}</small></div></div>}
+        {tenant && <div className="tenant-confirm"><span className="workspace-avatar">{tenant.name.slice(0, 1)}</span><div><strong>{tenant.name}</strong><small>{tenant.maskedPhone} · {tenant.tenantCode}</small></div></div>}
         <div className="field-group"><label htmlFor="lease-property">Property <span className="required-mark">*</span></label><select id="lease-property" value={form.propertyId} onChange={(event) => { const selected = properties.find((property) => property.id === Number(event.target.value)); setForm((current) => ({ ...current, propertyId: event.target.value, monthlyRent: selected?.rentAmount?.toString() || current.monthlyRent })) }} required><option value="">Choose available property</option>{properties.filter((property) => property.status === 'AVAILABLE').map((property) => <option key={property.id} value={property.id}>{property.title} · {property.address}</option>)}</select></div>
         <div className="form-grid"><Field label="Start date" id="lease-start" type="date" value={form.startDate} onChange={(value) => setForm((current) => ({ ...current, startDate: value }))} required /><Field label="Monthly rent" id="lease-rent" type="number" min="0.01" step="0.01" value={form.monthlyRent} onChange={(value) => setForm((current) => ({ ...current, monthlyRent: value }))} required /></div>
         <div className="form-grid"><Field label="Fine grace days" id="lease-grace" type="number" min="0" step="1" value={form.fineGraceDays} onChange={(value) => setForm((current) => ({ ...current, fineGraceDays: value }))} /><Field label="Fine per day" id="lease-fine" type="number" min="0" step="0.01" value={form.finePerDay} onChange={(value) => setForm((current) => ({ ...current, finePerDay: value }))} /></div>

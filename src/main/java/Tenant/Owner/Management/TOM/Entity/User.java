@@ -2,8 +2,11 @@ package Tenant.Owner.Management.TOM.Entity;
 
 import java.time.LocalDateTime;
 
+import Tenant.Owner.Management.TOM.Constants.UserRole;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -24,7 +27,8 @@ public class User {
     private String password;
     @Column(nullable = false)
     private String phone;
-    private String role;
+    @Enumerated(EnumType.STRING)
+    private UserRole role;
     @Column(name = "tenant_code")
     private String tenantCode;
     @Column(name = "created_at")

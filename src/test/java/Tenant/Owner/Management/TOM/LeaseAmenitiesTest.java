@@ -5,6 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -14,10 +17,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ResponseStatusException;
 
-import Tenant.Owner.Management.TOM.Constants.Constants;
+import Tenant.Owner.Management.TOM.Constants.LeaseStatus;
+import Tenant.Owner.Management.TOM.Constants.UserRole;
 import Tenant.Owner.Management.TOM.Entity.Lease;
 import Tenant.Owner.Management.TOM.Entity.Property;
 import Tenant.Owner.Management.TOM.Entity.User;
@@ -25,6 +30,7 @@ import Tenant.Owner.Management.TOM.Repository.LeaseRepository;
 import Tenant.Owner.Management.TOM.Repository.PropertyRepository;
 import Tenant.Owner.Management.TOM.Repository.UserRepository;
 import Tenant.Owner.Management.TOM.Service.LeaseService;
+import Tenant.Owner.Management.TOM.Service.RentService;
 
 @ExtendWith(MockitoExtension.class)
 class LeaseAmenitiesTest {
@@ -34,6 +40,10 @@ class LeaseAmenitiesTest {
     private PropertyRepository propertyRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private RentService rentService;
+    @Spy
+    private Clock clock = Clock.fixed(Instant.parse("2026-03-15T04:30:00Z"), ZoneId.of("Asia/Kolkata"));
 
     @InjectMocks
     private LeaseService leaseService;
@@ -42,7 +52,7 @@ class LeaseAmenitiesTest {
     void tenantLeaseResponseIncludesSortedAmenitiesFromActiveLease() {
         User tenant = new User();
         tenant.setId(7L);
-        tenant.setRole(Constants.ROLE_TENANT);
+        tenant.setRole(UserRole.TENANT);
         tenant.setName("Tenant Seven");
         User owner = new User();
         owner.setId(11L);
@@ -58,10 +68,10 @@ class LeaseAmenitiesTest {
         lease.setId(5L);
         lease.setTenant(tenant);
         lease.setProperty(property);
-        lease.setStatus(Constants.LEASE_ACTIVE);
+        lease.setStatus(LeaseStatus.ACTIVE);
         when(userRepository.findById(7L)).thenReturn(Optional.of(tenant));
-        when(userRepository.findById(11L)).thenReturn(Optional.of(owner));
-        when(leaseRepository.findTenantLeasesWithDetails(7L, Constants.LEASE_ACTIVE))
+        when(userRepository.findAllById(List.of(11L))).thenReturn(List.of(owner));
+        when(leaseRepository.findTenantLeasesWithDetails(7L, LeaseStatus.ACTIVE))
                 .thenReturn(List.of(lease));
 
         var response = leaseService.getMyActiveLeases(7L);
@@ -71,14 +81,14 @@ class LeaseAmenitiesTest {
         assertEquals("Owner Eleven", response.get(0).getOwnerName());
         assertEquals("owner@example.com", response.get(0).getOwnerEmail());
         assertEquals("555-0100", response.get(0).getOwnerPhone());
-        verify(leaseRepository).findTenantLeasesWithDetails(7L, Constants.LEASE_ACTIVE);
+        verify(leaseRepository).findTenantLeasesWithDetails(7L, LeaseStatus.ACTIVE);
     }
 
     @Test
     void nonTenantCannotReadTenantLeaseView() {
         User owner = new User();
         owner.setId(7L);
-        owner.setRole(Constants.ROLE_OWNER);
+        owner.setRole(UserRole.OWNER);
         when(userRepository.findById(7L)).thenReturn(Optional.of(owner));
 
         assertThrows(ResponseStatusException.class, () -> leaseService.getMyActiveLeases(7L));

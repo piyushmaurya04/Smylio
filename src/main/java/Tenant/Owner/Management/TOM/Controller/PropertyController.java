@@ -2,6 +2,8 @@ package Tenant.Owner.Management.TOM.Controller;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -30,7 +32,7 @@ public class PropertyController {
     }
 
     @PostMapping
-    public ResponseEntity<PropertyResponse> create(@RequestBody PropertyRequest request,
+    public ResponseEntity<PropertyResponse> create(@Valid @RequestBody PropertyRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         Long ownerId = JwtPrincipal.userId(jwt);
         PropertyResponse response = propertyService.create(request, ownerId);
@@ -50,7 +52,7 @@ public class PropertyController {
     }
 
     @PutMapping("/{id}")
-    public PropertyResponse update(@PathVariable Long id, @RequestBody PropertyRequest request,
+    public PropertyResponse update(@PathVariable Long id, @Valid @RequestBody PropertyRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         Long ownerId = JwtPrincipal.userId(jwt);
         return propertyService.updateProperty(id, ownerId, request);

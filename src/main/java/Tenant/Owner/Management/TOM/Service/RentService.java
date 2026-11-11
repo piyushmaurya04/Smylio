@@ -5,15 +5,21 @@ import Tenant.Owner.Management.TOM.Entity.RentPayment;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import Tenant.Owner.Management.TOM.Constants.Constants;
+import Tenant.Owner.Management.TOM.Constants.LeaseStatus;
+import Tenant.Owner.Management.TOM.Constants.PaymentMethod;
+import Tenant.Owner.Management.TOM.Constants.RentStatus;
+import Tenant.Owner.Management.TOM.Constants.UserRole;
 import Tenant.Owner.Management.TOM.DTO.DuesResponse;
 import Tenant.Owner.Management.TOM.DTO.RentResponse;
 import Tenant.Owner.Management.TOM.DTO.TenantRentsResponse;
@@ -27,35 +33,78 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class RentService {
 
+    private static final DateTimeFormatter MONTH_FMT = DateTimeFormatter.ofPattern("yyyy-MM");
+    private static final List<RentStatus> PAYABLE_STATUSES = List.of(
+            RentStatus.PENDING, RentStatus.LATE);
+
     private final RentPaymentRepository rentPaymentRepository;
     private final LeaseRepository leaseRepository;
     private final UserRepository userRepository;
-
-    public static final String RENT_PENDING = Constants.RENT_PENDING;
-    public static final String RENT_LATE = Constants.RENT_LATE;
-    public static final String RENT_AWAITING_APPROVAL = Constants.RENT_AWAITING_APPROVAL;
-    public static final String RENT_PAID = Constants.RENT_PAID;
-    public static final String METHOD_ONLINE = Constants.METHOD_ONLINE;
-    public static final String METHOD_CASH = Constants.METHOD_CASH;
+    private final Clock clock;
 
     public RentService(RentPaymentRepository rentPaymentRepository, LeaseRepository leaseRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository, Clock clock) {
         this.leaseRepository = leaseRepository;
         this.rentPaymentRepository = rentPaymentRepository;
         this.userRepository = userRepository;
+        this.clock = clock;
     }
 
     @Transactional
     public int generateRentForLease(Lease lease) {
+        return generateCompletedCyclesUpTo(lease, LocalDate.now(clock));
+    }
+
+    @Transactional
+    public int generateFinalRentOnLeaseEnd(Lease lease, LocalDate endDate) {
         LocalDate start = lease.getStartDate();
-        LocalDate today = LocalDate.now();
-        DateTimeFormatter monthFmt = DateTimeFormatter.ofPattern("yyyy-MM");
+        if (!endDate.isAfter(start)) {
+            applyFinesForLease(lease);
+            return 0;
+        }
+
+        int generated = generateCompletedCyclesUpTo(lease, endDate);
+
+        int k = 1;
+        while (!start.plusMonths(k).isAfter(endDate)) {
+            k++;
+        }
+        LocalDate cycleStart = start.plusMonths(k - 1);
+        LocalDate cycleEnd = start.plusMonths(k);
+
+        if (endDate.isAfter(cycleStart)) {
+            String forMonth = cycleStart.format(MONTH_FMT);
+            if (!rentPaymentRepository.existsByLeaseIdAndForMonth(lease.getId(), forMonth)) {
+                long daysOccupied = ChronoUnit.DAYS.between(cycleStart, endDate);
+                long daysInCycle = ChronoUnit.DAYS.between(cycleStart, cycleEnd);
+                BigDecimal proratedAmount = lease.getMonthlyRent()
+                        .multiply(BigDecimal.valueOf(daysOccupied))
+                        .divide(BigDecimal.valueOf(daysInCycle), 2, RoundingMode.HALF_UP);
+
+                RentPayment rent = new RentPayment();
+                rent.setLease(lease);
+                rent.setForMonth(forMonth);
+                rent.setAmount(proratedAmount);
+                rent.setDueDate(endDate);
+                rent.setFine(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+                rent.setStatus(RentStatus.PENDING);
+                rentPaymentRepository.save(rent);
+                generated++;
+            }
+        }
+
+        applyFinesForLease(lease);
+        return generated;
+    }
+
+    private int generateCompletedCyclesUpTo(Lease lease, LocalDate upToDate) {
+        LocalDate start = lease.getStartDate();
 
         int k = 1;
         int generated = 0;
-        while (!start.plusMonths(k).isAfter(today)) {
+        while (!start.plusMonths(k).isAfter(upToDate)) {
             LocalDate dueDate = start.plusMonths(k);
-            String forMonth = start.plusMonths(k - 1).format(monthFmt);
+            String forMonth = start.plusMonths(k - 1).format(MONTH_FMT);
 
             if (!rentPaymentRepository.existsByLeaseIdAndForMonth(lease.getId(), forMonth)) {
                 RentPayment rent = new RentPayment();
@@ -63,8 +112,8 @@ public class RentService {
                 rent.setForMonth(forMonth);
                 rent.setAmount(lease.getMonthlyRent());
                 rent.setDueDate(dueDate);
-                rent.setFine(java.math.BigDecimal.ZERO);
-                rent.setStatus(Constants.RENT_PENDING);
+                rent.setFine(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+                rent.setStatus(RentStatus.PENDING);
                 rentPaymentRepository.save(rent);
                 generated++;
             }
@@ -75,14 +124,14 @@ public class RentService {
 
     @Transactional
     public RentGenerationResult runDailyRentJob() {
-        List<Lease> activeLeases = leaseRepository.findByStatus(Constants.LEASE_ACTIVE);
+        List<Lease> activeLeases = leaseRepository.findByStatus(LeaseStatus.ACTIVE);
         return generateRentForLeases(activeLeases);
     }
 
     @Transactional
     public RentGenerationResult generateRentForOwner(long ownerId) {
         List<Lease> activeLeases = leaseRepository.findByProperty_OwnerIdAndStatus(
-                ownerId, Constants.LEASE_ACTIVE);
+                ownerId, LeaseStatus.ACTIVE);
         return generateRentForLeases(activeLeases);
     }
 
@@ -99,29 +148,25 @@ public class RentService {
 
     @Transactional
     public void applyFinesForLease(Lease lease) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         List<RentPayment> rents = rentPaymentRepository.findByLeaseIdOrderByDueDateDesc(lease.getId());
 
         for (RentPayment rent : rents) {
-            boolean unpaid = Constants.RENT_PENDING.equals(rent.getStatus())
-                    || Constants.RENT_LATE.equals(rent.getStatus());
-            if (!unpaid)
+            boolean unpaid = RentStatus.PENDING == rent.getStatus()
+                    || RentStatus.LATE == rent.getStatus();
+            if (!unpaid) {
                 continue;
+            }
 
-            long daysLate = java.time.temporal.ChronoUnit.DAYS.between(rent.getDueDate(), today);
-            long chargeableDays = daysLate - lease.getFineGraceDays();
-
-            if (chargeableDays > 0) {
-                java.math.BigDecimal fine = lease.getFinePerDay()
-                        .multiply(java.math.BigDecimal.valueOf(chargeableDays));
-                rent.setFine(fine);
-                rent.setStatus(Constants.RENT_LATE);
+            if (isOverdue(rent.getDueDate(), today, lease)) {
+                rent.setFine(computeFine(rent.getDueDate(), today, lease));
+                rent.setStatus(RentStatus.LATE);
                 rentPaymentRepository.save(rent);
             }
         }
     }
 
-    @Scheduled(cron = "0 0 0 * * *")
+    @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Kolkata")
     public void scheduledDailyRentJob() {
         runDailyRentJob();
     }
@@ -131,22 +176,24 @@ public class RentService {
         RentPayment rent = rentPaymentRepository.findByIdAndLease_TenantId(rentId, tenantId)
                 .orElseThrow(() -> new NoSuchElementException("Rent not found : " + rentId));
 
-        boolean payable = Constants.RENT_PENDING.equals(rent.getStatus())
-                || Constants.RENT_LATE.equals(rent.getStatus());
-
-        if (!payable) {
+        if (!PAYABLE_STATUSES.contains(rent.getStatus())) {
             throw new IllegalStateException("Rent is not payable (current status: " + rent.getStatus() + ")");
         }
 
-        rent.setStatus((Constants.RENT_PAID));
-        rent.setMethod(Constants.METHOD_ONLINE);
-        rent.setTransactionId(UUID.randomUUID().toString());
-        rent.setPaidDate(LocalDate.now());
+        LocalDate today = LocalDate.now(clock);
+        BigDecimal finalFine = computeFine(rent.getDueDate(), today, rent.getLease());
+        String txnId = UUID.randomUUID().toString();
 
-        RentPayment saved = rentPaymentRepository.save(rent);
+        int updated = rentPaymentRepository.markPaidOnlineIfPayable(
+                rentId, tenantId, RentStatus.PAID, PaymentMethod.ONLINE,
+                txnId, today, finalFine, PAYABLE_STATUSES);
+        if (updated == 0) {
+            throw new IllegalStateException("Rent is already paid or awaiting approval");
+        }
 
+        RentPayment saved = rentPaymentRepository.findByIdAndLease_TenantId(rentId, tenantId)
+                .orElseThrow(() -> new NoSuchElementException("Rent not found : " + rentId));
         return toResponse(saved);
-
     }
 
     private RentResponse toResponse(RentPayment rent) {
@@ -158,9 +205,9 @@ public class RentService {
         r.setFine(rent.getFine());
         r.setDueDate(rent.getDueDate());
         r.setPaidDate(rent.getPaidDate());
-        r.setMethod(rent.getMethod());
+        r.setMethod(rent.getMethod() != null ? rent.getMethod().name() : null);
         r.setTransactionId(rent.getTransactionId());
-        r.setStatus(rent.getStatus());
+        r.setStatus(rent.getStatus() != null ? rent.getStatus().name() : null);
         return r;
     }
 
@@ -169,15 +216,23 @@ public class RentService {
         RentPayment rent = rentPaymentRepository.findByIdAndLease_TenantId(rentID, tenantId)
                 .orElseThrow(() -> new NoSuchElementException("Rent not found"));
 
-        boolean payable = Constants.RENT_PENDING.equals(rent.getStatus())
-                || Constants.RENT_LATE.equals(rent.getStatus());
-        if (!payable) {
+        if (!PAYABLE_STATUSES.contains(rent.getStatus())) {
             throw new IllegalStateException("Rent is not payable (status: " + rent.getStatus() + ")");
         }
-        rent.setStatus(Constants.RENT_AWAITING_APPROVAL);
-        rent.setMethod(Constants.METHOD_CASH);
-        return toResponse(rentPaymentRepository.save(rent));
 
+        LocalDate today = LocalDate.now(clock);
+        BigDecimal frozenFine = computeFine(rent.getDueDate(), today, rent.getLease());
+
+        int updated = rentPaymentRepository.markCashClaimIfPayable(
+                rentID, tenantId, RentStatus.AWAITING_APPROVAL, PaymentMethod.CASH,
+                frozenFine, PAYABLE_STATUSES);
+        if (updated == 0) {
+            throw new IllegalStateException("Rent is already paid or awaiting approval");
+        }
+
+        RentPayment saved = rentPaymentRepository.findByIdAndLease_TenantId(rentID, tenantId)
+                .orElseThrow(() -> new NoSuchElementException("Rent not found"));
+        return toResponse(saved);
     }
 
     @Transactional
@@ -185,14 +240,20 @@ public class RentService {
         RentPayment rent = rentPaymentRepository.findByIdAndLease_Property_OwnerId(rentId, ownerId)
                 .orElseThrow(() -> new NoSuchElementException("Rent not found: " + rentId));
 
-        if (!Constants.RENT_AWAITING_APPROVAL.equals(rent.getStatus())) {
+        if (RentStatus.AWAITING_APPROVAL != rent.getStatus()) {
             throw new IllegalStateException("Rent is not awaiting approval (status: " + rent.getStatus() + ")");
         }
 
-        rent.setStatus(RENT_PAID);
-        rent.setPaidDate(LocalDate.now());
+        LocalDate today = LocalDate.now(clock);
+        int updated = rentPaymentRepository.approveCashIfAwaiting(
+                rentId, ownerId, RentStatus.PAID, today, RentStatus.AWAITING_APPROVAL);
+        if (updated == 0) {
+            throw new IllegalStateException("Rent is no longer awaiting approval");
+        }
 
-        return toResponse(rentPaymentRepository.save(rent));
+        RentPayment saved = rentPaymentRepository.findByIdAndLease_Property_OwnerId(rentId, ownerId)
+                .orElseThrow(() -> new NoSuchElementException("Rent not found: " + rentId));
+        return toResponse(saved);
     }
 
     @Transactional
@@ -200,22 +261,53 @@ public class RentService {
         RentPayment rent = rentPaymentRepository.findByIdAndLease_Property_OwnerId(rentId, ownerId)
                 .orElseThrow(() -> new NoSuchElementException("Rent not found: " + rentId));
 
-        if (!Constants.RENT_AWAITING_APPROVAL.equals(rent.getStatus())) {
+        if (RentStatus.AWAITING_APPROVAL != rent.getStatus()) {
             throw new IllegalStateException("Rent is not awaiting approval (status: " + rent.getStatus() + ")");
         }
-        rent.setStatus(Constants.RENT_PENDING);
-        rent.setMethod(null);
-        return toResponse(rentPaymentRepository.save(rent));
+
+        LocalDate today = LocalDate.now(clock);
+        Lease lease = rent.getLease();
+        boolean overdue = isOverdue(rent.getDueDate(), today, lease);
+        RentStatus resumedStatus = overdue ? RentStatus.LATE : RentStatus.PENDING;
+        BigDecimal resumedFine = overdue
+                ? computeFine(rent.getDueDate(), today, lease)
+                : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
+        int updated = rentPaymentRepository.rejectCashIfAwaiting(
+                rentId, ownerId, resumedStatus, resumedFine, RentStatus.AWAITING_APPROVAL);
+        if (updated == 0) {
+            throw new IllegalStateException("Rent is no longer awaiting approval");
+        }
+
+        RentPayment saved = rentPaymentRepository.findByIdAndLease_Property_OwnerId(rentId, ownerId)
+                .orElseThrow(() -> new NoSuchElementException("Rent not found: " + rentId));
+        return toResponse(saved);
+    }
+
+    private BigDecimal computeFine(LocalDate dueDate, LocalDate asOf, Lease lease) {
+        long daysLate = ChronoUnit.DAYS.between(dueDate, asOf);
+        long chargeableDays = daysLate - lease.getFineGraceDays();
+        if (chargeableDays <= 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        return lease.getFinePerDay()
+                .multiply(BigDecimal.valueOf(chargeableDays))
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private boolean isOverdue(LocalDate dueDate, LocalDate asOf, Lease lease) {
+        return ChronoUnit.DAYS.between(dueDate, asOf) > lease.getFineGraceDays();
     }
 
     public List<RentResponse> getPendingApprovals(Long ownerId) {
         return rentPaymentRepository
-                .findByLease_Property_OwnerIdAndStatus(ownerId, Constants.RENT_AWAITING_APPROVAL)
+                .findByLease_Property_OwnerIdAndStatus(ownerId, RentStatus.AWAITING_APPROVAL)
                 .stream().map(this::toResponse).toList();
     }
 
     public DuesResponse getDues(long tenantId) {
-        List<String> unpaidStatus = List.of(RENT_PENDING, RENT_LATE, RENT_AWAITING_APPROVAL);
+        List<RentStatus> unpaidStatus = List.of(
+                RentStatus.PENDING, RentStatus.LATE, RentStatus.AWAITING_APPROVAL);
 
         List<RentPayment> unpaid = rentPaymentRepository.findByLease_TenantIdAndStatusIn(tenantId, unpaidStatus);
         BigDecimal total = BigDecimal.ZERO;
@@ -237,7 +329,7 @@ public class RentService {
     public TenantRentsResponse getMyRents(Long tenantId) {
         User tenant = userRepository.findById(tenantId)
                 .orElseThrow(() -> new NoSuchElementException("User not found: " + tenantId));
-        requireRole(tenant, Constants.ROLE_TENANT);
+        requireRole(tenant, UserRole.TENANT);
 
         DuesResponse dues = getDues(tenantId);
         List<RentResponse> history = rentPaymentRepository
@@ -261,13 +353,13 @@ public class RentService {
         if (ownerId != null) {
             User owner = userRepository.findById(ownerId)
                     .orElseThrow(() -> new NoSuchElementException("User not found: " + ownerId));
-            requireRole(owner, Constants.ROLE_OWNER);
+            requireRole(owner, UserRole.OWNER);
             leaseRepository.findByIdAndProperty_OwnerId(leaseId, ownerId)
                     .orElseThrow(() -> new NoSuchElementException("Lease not found: " + leaseId));
         } else {
             User tenant = userRepository.findById(tenantId)
                     .orElseThrow(() -> new NoSuchElementException("User not found: " + tenantId));
-            requireRole(tenant, Constants.ROLE_TENANT);
+            requireRole(tenant, UserRole.TENANT);
             leaseRepository.findByIdAndTenantId(leaseId, tenantId)
                     .orElseThrow(() -> new NoSuchElementException("Lease not found: " + leaseId));
         }
@@ -276,8 +368,8 @@ public class RentService {
                 .stream().map(this::toResponse).toList();
     }
 
-    private void requireRole(User user, String requiredRole) {
-        if (!requiredRole.equals(user.getRole())) {
+    private void requireRole(User user, UserRole requiredRole) {
+        if (requiredRole != user.getRole()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "This action is not allowed for this user role");
         }

@@ -1,4 +1,4 @@
-import axios, { type AxiosInstance } from 'axios'
+import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
 import type {
   AuthResponse,
   ApiPage,
@@ -13,16 +13,64 @@ import type {
   Role,
   TenantRents,
   TenantDetails,
+  TenantSearchResult,
   User,
 } from './types'
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || ''
 
+interface RetryableRequestConfig extends InternalAxiosRequestConfig {
+  _retried?: boolean
+}
+
+let authBridge: {
+  refreshToken: () => Promise<string | null>
+  onUnauthorized: () => void
+} | null = null
+
+export function configureAuthBridge(bridge: {
+  refreshToken: () => Promise<string | null>
+  onUnauthorized: () => void
+}) {
+  authBridge = bridge
+}
+
+let refreshInFlight: Promise<AuthResponse> | null = null
+
 function client(token?: string): AxiosInstance {
-  return axios.create({
+  const instance = axios.create({
     baseURL,
+    withCredentials: true,
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   })
+
+  if (token) {
+    instance.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        const original = error?.config as RetryableRequestConfig | undefined
+        if (
+          axios.isAxiosError(error) &&
+          error.response?.status === 401 &&
+          original &&
+          !original._retried &&
+          !original.url?.startsWith('/api/auth/') &&
+          authBridge
+        ) {
+          original._retried = true
+          const freshToken = await authBridge.refreshToken()
+          if (freshToken) {
+            original.headers.set('Authorization', `Bearer ${freshToken}`)
+            return instance.request(original)
+          }
+          authBridge.onUnauthorized()
+        }
+        return Promise.reject(error)
+      },
+    )
+  }
+
+  return instance
 }
 
 export function errorMessage(error: unknown): string {
@@ -41,6 +89,20 @@ export const api = {
   async login(email: string, password: string) {
     const response = await client().post<AuthResponse>('/api/auth/login', { email, password })
     return response.data
+  },
+  async refresh() {
+    if (!refreshInFlight) {
+      refreshInFlight = client()
+        .post<AuthResponse>('/api/auth/refresh')
+        .then((response) => response.data)
+        .finally(() => {
+          refreshInFlight = null
+        })
+    }
+    return refreshInFlight
+  },
+  async logout() {
+    await client().post('/api/auth/logout')
   },
   async profile(token: string) {
     return (await client(token).get<User>('/api/profile')).data
@@ -73,7 +135,7 @@ export const api = {
     return (await client(token).put<Lease>(`/api/leases/${id}/end`)).data
   },
   async findTenant(token: string, code: string) {
-    return (await client(token).get<User>('/api/tenants/search', { params: { code } })).data
+    return (await client(token).get<TenantSearchResult>('/api/tenants/search', { params: { code } })).data
   },
   async tenantDetails(token: string, id: number) {
     return (await client(token).get<TenantDetails>(`/api/tenants/${id}`)).data

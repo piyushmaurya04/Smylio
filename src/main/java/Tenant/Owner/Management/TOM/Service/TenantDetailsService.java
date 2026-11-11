@@ -8,7 +8,7 @@ import java.util.NoSuchElementException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import Tenant.Owner.Management.TOM.Constants.Constants;
+import Tenant.Owner.Management.TOM.Constants.UserRole;
 import Tenant.Owner.Management.TOM.DTO.LeaseResponse;
 import Tenant.Owner.Management.TOM.DTO.TenantDetailsResponse;
 import Tenant.Owner.Management.TOM.Entity.Lease;
@@ -40,7 +40,7 @@ public class TenantDetailsService {
         }
 
         User tenant = userRepository.findById(tenantId)
-                .filter(user -> Constants.ROLE_TENANT.equals(user.getRole()))
+                .filter(user -> UserRole.TENANT == user.getRole())
                 .orElseThrow(() -> new NoSuchElementException("Tenant not found for this owner"));
 
         TenantDetailsResponse response = new TenantDetailsResponse();
@@ -58,11 +58,13 @@ public class TenantDetailsService {
                         maintenanceRequestRepository.countByTenantIdAndPropertyIdAndProperty_OwnerId(
                                 tenantId, propertyId, ownerId)));
         response.setMaintenanceRequestsByProperty(maintenanceRequestsByProperty);
-        response.setLeases(leases.stream().map(this::toLeaseResponse).toList());
+        User owner = userRepository.findById(ownerId)
+                .orElseThrow(() -> new NoSuchElementException("Property owner not found"));
+        response.setLeases(leases.stream().map(lease -> toLeaseResponse(lease, owner)).toList());
         return response;
     }
 
-    private LeaseResponse toLeaseResponse(Lease lease) {
+    private LeaseResponse toLeaseResponse(Lease lease, User owner) {
         LeaseResponse response = new LeaseResponse();
         response.setId(lease.getId());
         response.setPropertyId(lease.getProperty().getId());
@@ -72,8 +74,6 @@ public class TenantDetailsService {
         response.setTenantId(lease.getTenant().getId());
         response.setTenantName(lease.getTenant().getName());
         response.setTenantCode(lease.getTenant().getTenantCode());
-        User owner = userRepository.findById(lease.getProperty().getOwnerId())
-                .orElseThrow(() -> new NoSuchElementException("Property owner not found"));
         response.setOwnerName(owner.getName());
         response.setOwnerEmail(owner.getEmail());
         response.setOwnerPhone(owner.getPhone());
@@ -82,7 +82,7 @@ public class TenantDetailsService {
         response.setMonthlyRent(lease.getMonthlyRent());
         response.setFineGraceDays(lease.getFineGraceDays());
         response.setFinePerDay(lease.getFinePerDay());
-        response.setStatus(lease.getStatus());
+        response.setStatus(lease.getStatus() != null ? lease.getStatus().name() : null);
         return response;
     }
 }

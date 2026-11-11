@@ -2,7 +2,7 @@ package Tenant.Owner.Management.TOM.Security;
 
 import org.springframework.security.oauth2.jwt.Jwt;
 
-import Tenant.Owner.Management.TOM.Constants.Constants;
+import Tenant.Owner.Management.TOM.Constants.UserRole;
 
 public final class JwtPrincipal {
     private JwtPrincipal() {
@@ -13,10 +13,10 @@ public final class JwtPrincipal {
     }
 
     public static Long ownerIdOrNull(Jwt jwt) {
-        return Constants.ROLE_OWNER.equals(jwt.getClaimAsString("role")) ? userId(jwt) : null;
+        return UserRole.OWNER.name().equals(jwt.getClaimAsString("role")) ? userId(jwt) : null;
     }
 
     public static Long tenantIdOrNull(Jwt jwt) {
-        return Constants.ROLE_TENANT.equals(jwt.getClaimAsString("role")) ? userId(jwt) : null;
+        return UserRole.TENANT.name().equals(jwt.getClaimAsString("role")) ? userId(jwt) : null;
     }
 }
