@@ -93,8 +93,8 @@ public class RefreshTokenService {
             return;
         }
         String hash = sha256Hex(rawRefreshToken);
-        refreshTokenRepository.findByTokenHash(hash).ifPresent(token ->
-                refreshTokenRepository.revokeFamily(token.getFamilyId(), LocalDateTime.now(clock)));
+        refreshTokenRepository.findByTokenHash(hash)
+                .ifPresent(token -> refreshTokenRepository.revokeFamily(token.getFamilyId(), LocalDateTime.now(clock)));
     }
 
     public long getExpirationDays() {
@@ -127,6 +127,6 @@ public class RefreshTokenService {
         }
     }
 
-    public record RotatedSession(User user, String refreshToken) {}
+    public record RotatedSession(User user, String refreshToken) {
+    }
 }
-
