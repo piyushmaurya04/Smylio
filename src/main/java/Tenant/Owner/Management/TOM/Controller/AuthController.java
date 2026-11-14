@@ -51,7 +51,9 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request, HttpServletRequest httpRequest) {
+        String normalizedEmail = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase(Locale.ROOT);
+        rateLimitService.consumeRegisterAttempt(httpRequest.getRemoteAddr(), normalizedEmail);
         UserResponse response = userService.register(request);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

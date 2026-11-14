@@ -58,6 +58,10 @@ public class SecurityConfiguration {
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             @Value("${app.cors.enabled:false}") boolean corsEnabled) throws Exception {
+        // CSRF is disabled globally because all authenticated API endpoints use stateless Authorization: Bearer JWTs.
+        // The cookie-based auth endpoints (/api/auth/refresh and /api/auth/logout) are protected against CSRF via:
+        // 1. SameSite=Strict, HttpOnly, Secure, and Path=/api/auth cookie attributes.
+        // 2. AuthOriginValidatorFilter enforcing strict Origin, Referer, and Sec-Fetch-Site validation.
         http.csrf(AbstractHttpConfigurer::disable);
         if (corsEnabled) {
             http.cors(Customizer.withDefaults());

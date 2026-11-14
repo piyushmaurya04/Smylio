@@ -117,5 +117,25 @@ class UserServiceAndAuthHardeningTest {
         }
         assertThrows(RateLimitExceededException.class, () -> rateLimitService.consumeTenantSearch(1L));
     }
+
+    @Test
+    void registerRateLimiterBlocksExcessiveBurstByIp() {
+        RateLimitService rateLimitService = new RateLimitService();
+        for (int i = 0; i < 30; i++) {
+            rateLimitService.consumeRegisterAttempt("192.168.1.50", "user" + i + "@example.com");
+        }
+        assertThrows(RateLimitExceededException.class,
+                () -> rateLimitService.consumeRegisterAttempt("192.168.1.50", "overflow@example.com"));
+    }
+
+    @Test
+    void registerRateLimiterBlocksExcessiveBurstByEmail() {
+        RateLimitService rateLimitService = new RateLimitService();
+        for (int i = 0; i < 5; i++) {
+            rateLimitService.consumeRegisterAttempt("10.0.0." + i, "target@example.com");
+        }
+        assertThrows(RateLimitExceededException.class,
+                () -> rateLimitService.consumeRegisterAttempt("10.0.0.99", "target@example.com"));
+    }
 }
 
