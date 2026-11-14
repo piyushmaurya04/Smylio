@@ -1,6 +1,7 @@
 package Tenant.Owner.Management.TOM.Controller;
 
 import java.util.List;
+import java.util.Locale;
 
 import jakarta.validation.Valid;
 
@@ -24,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.server.ResponseStatusException;
 
+import Tenant.Owner.Management.TOM.Constants.MaintenanceStatus;
 import Tenant.Owner.Management.TOM.DTO.CommentResponse;
 import Tenant.Owner.Management.TOM.DTO.MaintenanceCommentCreate;
 import Tenant.Owner.Management.TOM.DTO.MaintenanceRequestCreate;
@@ -50,19 +52,40 @@ public class MaintenanceController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) Long propertyId) {
+            @RequestParam(required = false) Long propertyId,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir) {
         if (page < 0 || size < 1) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Page must be non-negative and size must be positive");
         }
-        Pageable pageable = PageRequest.of(page, Math.min(size, MAX_PAGE_SIZE),
-                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
+
+        MaintenanceStatus statusEnum = null;
+        if (status != null && !status.isBlank()) {
+            try {
+                statusEnum = MaintenanceStatus.valueOf(status.trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException ex) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid maintenance status: " + status);
+            }
+        }
+
+        Sort.Direction direction = "asc".equalsIgnoreCase(sortDir) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        String safeSortProperty = switch (sortBy == null ? "" : sortBy.trim().toLowerCase(Locale.ROOT)) {
+            case "status" -> "status";
+            case "priority" -> "priority";
+            case "title" -> "title";
+            default -> "createdAt";
+        };
+        Sort sort = Sort.by(new Sort.Order(direction, safeSortProperty), new Sort.Order(Sort.Direction.DESC, "id"));
+        Pageable pageable = PageRequest.of(page, Math.min(size, MAX_PAGE_SIZE), sort);
+
         Long ownerId = JwtPrincipal.ownerIdOrNull(jwt);
         Long tenantId = JwtPrincipal.tenantIdOrNull(jwt);
-        logger.info("Maintenance list requested: actorRole={} actorId={} page={} size={} propertyId={}",
-                jwt.getClaimAsString("role"), jwt.getSubject(), page, pageable.getPageSize(), propertyId);
+        logger.info("Maintenance list requested: actorRole={} actorId={} page={} size={} propertyId={} status={} sortBy={} sortDir={}",
+                jwt.getClaimAsString("role"), jwt.getSubject(), page, pageable.getPageSize(), propertyId, statusEnum, safeSortProperty, direction);
         Page<MaintenanceResponse> result = maintenanceService.getRequestsPage(
-                ownerId, tenantId, pageable, search, propertyId);
+                ownerId, tenantId, pageable, search, propertyId, statusEnum);
         logger.info("Maintenance list completed: actorRole={} actorId={} page={} totalElements={}",
                 jwt.getClaimAsString("role"), jwt.getSubject(), page, result.getTotalElements());
         return result;

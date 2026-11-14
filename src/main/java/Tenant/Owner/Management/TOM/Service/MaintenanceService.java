@@ -106,6 +106,12 @@ public class MaintenanceService {
     @Transactional(readOnly = true)
     public Page<MaintenanceResponse> getRequestsPage(Long ownerId, Long tenantId, Pageable pageable,
             String search, Long propertyId) {
+        return getRequestsPage(ownerId, tenantId, pageable, search, propertyId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<MaintenanceResponse> getRequestsPage(Long ownerId, Long tenantId, Pageable pageable,
+            String search, Long propertyId, MaintenanceStatus status) {
         if ((ownerId == null) == (tenantId == null)) {
             throw new IllegalArgumentException("Provide exactly one of ownerId or tenantId");
         }
@@ -114,19 +120,19 @@ public class MaintenanceService {
             User owner = requireUser(ownerId);
             requireRole(owner, UserRole.OWNER);
             Page<MaintenanceResponse> result = maintenanceRequestRepository
-                    .findOwnerRequests(ownerId, normalizedSearch, propertyId, pageable)
+                    .findOwnerRequests(ownerId, status, normalizedSearch, propertyId, pageable)
                     .map(this::toResponse);
-            logger.info("Maintenance owner query completed: ownerId={} page={} totalElements={}",
-                    ownerId, pageable.getPageNumber(), result.getTotalElements());
+            logger.info("Maintenance owner query completed: ownerId={} status={} page={} totalElements={}",
+                    ownerId, status, pageable.getPageNumber(), result.getTotalElements());
             return result;
         }
         User tenant = requireUser(tenantId);
         requireRole(tenant, UserRole.TENANT);
         Page<MaintenanceResponse> result = maintenanceRequestRepository
-                .findTenantRequests(tenantId, normalizedSearch, propertyId, pageable)
+                .findTenantRequests(tenantId, status, normalizedSearch, propertyId, pageable)
                 .map(this::toResponse);
-        logger.info("Maintenance tenant query completed: tenantId={} page={} totalElements={}",
-                tenantId, pageable.getPageNumber(), result.getTotalElements());
+        logger.info("Maintenance tenant query completed: tenantId={} status={} page={} totalElements={}",
+                tenantId, status, pageable.getPageNumber(), result.getTotalElements());
         return result;
     }
 

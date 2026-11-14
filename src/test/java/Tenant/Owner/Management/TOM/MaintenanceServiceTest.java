@@ -249,7 +249,7 @@ class MaintenanceServiceTest {
         MaintenanceRequest request = request(11L, property(3L), tenant(7L));
         var pageable = PageRequest.of(0, 5);
         when(userRepository.findById(2L)).thenReturn(Optional.of(owner));
-        when(maintenanceRequestRepository.findOwnerRequests(2L, "leak", 3L, pageable))
+        when(maintenanceRequestRepository.findOwnerRequests(2L, null, "leak", 3L, pageable))
                 .thenReturn(new PageImpl<>(List.of(request), pageable, 1));
 
         var result = maintenanceService.getRequestsPage(2L, null, pageable, " leak ", 3L);
@@ -257,6 +257,38 @@ class MaintenanceServiceTest {
         assertEquals(1, result.getTotalElements());
         assertEquals(11L, result.getContent().get(0).getId());
         assertEquals("Tenant 7", result.getContent().get(0).getTenantName());
+    }
+
+    @Test
+    void ownerPageFiltersByStatusAndSort() {
+        User owner = owner(2L);
+        MaintenanceRequest request = request(12L, property(3L), tenant(7L));
+        request.setStatus(MaintenanceStatus.OPEN);
+        var pageable = PageRequest.of(0, 5, org.springframework.data.domain.Sort.by("status"));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(owner));
+        when(maintenanceRequestRepository.findOwnerRequests(2L, MaintenanceStatus.OPEN, "leak", 3L, pageable))
+                .thenReturn(new PageImpl<>(List.of(request), pageable, 1));
+
+        var result = maintenanceService.getRequestsPage(2L, null, pageable, " leak ", 3L, MaintenanceStatus.OPEN);
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals(MaintenanceStatus.OPEN.name(), result.getContent().get(0).getStatus());
+    }
+
+    @Test
+    void tenantPageFiltersByStatus() {
+        User tenant = tenant(7L);
+        MaintenanceRequest request = request(14L, property(3L), tenant);
+        request.setStatus(MaintenanceStatus.IN_PROGRESS);
+        var pageable = PageRequest.of(0, 5, org.springframework.data.domain.Sort.by("status"));
+        when(userRepository.findById(7L)).thenReturn(Optional.of(tenant));
+        when(maintenanceRequestRepository.findTenantRequests(7L, MaintenanceStatus.IN_PROGRESS, "", null, pageable))
+                .thenReturn(new PageImpl<>(List.of(request), pageable, 1));
+
+        var result = maintenanceService.getRequestsPage(null, 7L, pageable, null, null, MaintenanceStatus.IN_PROGRESS);
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals(MaintenanceStatus.IN_PROGRESS.name(), result.getContent().get(0).getStatus());
     }
 
     private User owner(Long id) {

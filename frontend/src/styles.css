@@ -430,6 +430,8 @@ td strong { display: block; font-size: 14px; font-weight: 600; }
 .notice-table-filters select { min-width: 155px; min-height: 38px; padding: 0 11px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-raised); color: var(--text); font-size: 14px; }
 .notice-table { min-width: 550px; }
 .notice-table th { padding: 0 13px 11px; }
+.sortable-header { cursor: pointer; user-select: none; transition: color 0.15s ease; }
+.sortable-header:hover { color: var(--accent); }
 .notice-table td { padding-block: 14px; }
 .notice-table td:last-child, .notice-table th:last-child { width: 68px; text-align: center; }
 .notice-table tbody tr:hover { background: color-mix(in srgb, var(--surface-soft) 55%, transparent); }

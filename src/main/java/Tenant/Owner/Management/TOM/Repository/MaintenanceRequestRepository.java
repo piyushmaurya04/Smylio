@@ -31,6 +31,7 @@ public interface MaintenanceRequestRepository extends JpaRepository<MaintenanceR
 
     @Query(value = "SELECT m FROM MaintenanceRequest m " +
             "WHERE m.property.ownerId = :ownerId " +
+            "AND (:status IS NULL OR m.status = :status) " +
             "AND (:search IS NULL OR LOWER(m.title) LIKE LOWER(CONCAT('%', :search, '%')) " +
             "OR LOWER(m.description) LIKE LOWER(CONCAT('%', :search, '%')) " +
             "OR LOWER(m.property.title) LIKE LOWER(CONCAT('%', :search, '%')) " +
@@ -38,30 +39,49 @@ public interface MaintenanceRequestRepository extends JpaRepository<MaintenanceR
             "AND (:propertyId IS NULL OR m.property.id = :propertyId)",
             countQuery = "SELECT COUNT(m) FROM MaintenanceRequest m " +
                     "WHERE m.property.ownerId = :ownerId " +
+                    "AND (:status IS NULL OR m.status = :status) " +
                     "AND (:search IS NULL OR LOWER(m.title) LIKE LOWER(CONCAT('%', :search, '%')) " +
                     "OR LOWER(m.description) LIKE LOWER(CONCAT('%', :search, '%')) " +
                     "OR LOWER(m.property.title) LIKE LOWER(CONCAT('%', :search, '%')) " +
                     "OR LOWER(m.tenant.name) LIKE LOWER(CONCAT('%', :search, '%'))) " +
                     "AND (:propertyId IS NULL OR m.property.id = :propertyId)")
     Page<MaintenanceRequest> findOwnerRequests(@Param("ownerId") Long ownerId,
+            @Param("status") MaintenanceStatus status,
             @Param("search") String search,
             @Param("propertyId") Long propertyId,
             Pageable pageable);
 
+    default Page<MaintenanceRequest> findOwnerRequests(Long ownerId,
+            String search,
+            Long propertyId,
+            Pageable pageable) {
+        return findOwnerRequests(ownerId, null, search, propertyId, pageable);
+    }
+
     @Query(value = "SELECT m FROM MaintenanceRequest m " +
             "WHERE m.tenant.id = :tenantId " +
+            "AND (:status IS NULL OR m.status = :status) " +
             "AND (:search IS NULL OR LOWER(m.title) LIKE LOWER(CONCAT('%', :search, '%')) " +
             "OR LOWER(m.description) LIKE LOWER(CONCAT('%', :search, '%')) " +
             "OR LOWER(m.property.title) LIKE LOWER(CONCAT('%', :search, '%'))) " +
             "AND (:propertyId IS NULL OR m.property.id = :propertyId)",
             countQuery = "SELECT COUNT(m) FROM MaintenanceRequest m " +
                     "WHERE m.tenant.id = :tenantId " +
+                    "AND (:status IS NULL OR m.status = :status) " +
                     "AND (:search IS NULL OR LOWER(m.title) LIKE LOWER(CONCAT('%', :search, '%')) " +
                     "OR LOWER(m.description) LIKE LOWER(CONCAT('%', :search, '%')) " +
                     "OR LOWER(m.property.title) LIKE LOWER(CONCAT('%', :search, '%'))) " +
                     "AND (:propertyId IS NULL OR m.property.id = :propertyId)")
     Page<MaintenanceRequest> findTenantRequests(@Param("tenantId") Long tenantId,
+            @Param("status") MaintenanceStatus status,
             @Param("search") String search,
             @Param("propertyId") Long propertyId,
             Pageable pageable);
+
+    default Page<MaintenanceRequest> findTenantRequests(Long tenantId,
+            String search,
+            Long propertyId,
+            Pageable pageable) {
+        return findTenantRequests(tenantId, null, search, propertyId, pageable);
+    }
 }

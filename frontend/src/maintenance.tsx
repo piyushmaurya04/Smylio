@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Ban, ChevronLeft, ChevronRight, Eye, Pencil, Plus, Search, Send } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Ban, ChevronLeft, ChevronRight, Eye, Pencil, Plus, Search, Send } from 'lucide-react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, errorMessage } from './api'
 import { useAuth } from './auth-context'
@@ -26,6 +26,9 @@ export function MaintenancePage() {
   const [form, setForm] = useState({ title: '', description: '', priority: 'MEDIUM' })
   const [search, setSearch] = useState('')
   const [propertyFilter, setPropertyFilter] = useState(() => searchParams.get('propertyId') ?? '')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [sortBy, setSortBy] = useState('createdAt')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(0)
   const [total, setTotal] = useState(0)
   const [pageCount, setPageCount] = useState(0)
@@ -42,6 +45,9 @@ export function MaintenancePage() {
         size: pageSize,
         search: search.trim() || undefined,
         propertyId: propertyFilter ? Number(propertyFilter) : undefined,
+        status: statusFilter || undefined,
+        sortBy,
+        sortDir,
       })
       setRequests(result.content)
       setTotal(result.totalElements)
@@ -51,7 +57,7 @@ export function MaintenancePage() {
     } finally {
       setLoading(false)
     }
-  }, [token, page, search, propertyFilter])
+  }, [token, page, search, propertyFilter, statusFilter, sortBy, sortDir])
 
   useEffect(() => { void load() }, [load])
 
@@ -155,9 +161,22 @@ export function MaintenancePage() {
     }
   }
 
-  const hasFilters = Boolean(search.trim() || propertyFilter)
+  const hasFilters = Boolean(search.trim() || propertyFilter || statusFilter || sortBy !== 'createdAt')
   const shownStart = total === 0 ? 0 : page * pageSize + 1
   const shownEnd = Math.min((page + 1) * pageSize, total)
+
+  function toggleStatusSort() {
+    setPage(0)
+    if (sortBy !== 'status') {
+      setSortBy('status')
+      setSortDir('asc')
+    } else if (sortDir === 'asc') {
+      setSortDir('desc')
+    } else {
+      setSortBy('createdAt')
+      setSortDir('desc')
+    }
+  }
 
   return <section className="page-section">
     <PageHeading eyebrow="PROPERTY CARE" title="Maintenance" subtitle={owner ? 'Track and resolve tenant-reported property issues.' : 'Report an issue and follow its progress.'} action={!owner && leases.length > 0 ? <button className="button button-primary" onClick={() => setCreateOpen(true)}><Plus size={15} /> New request</button> : undefined} />
@@ -168,11 +187,52 @@ export function MaintenancePage() {
         <option value="">All properties</option>
         {properties.map((property) => <option key={property.id} value={property.id}>{property.title}</option>)}
       </select>
+      <select aria-label="Filter requests by status" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(0) }}>
+        <option value="">All statuses</option>
+        <option value="OPEN">Open</option>
+        <option value="IN_PROGRESS">In progress</option>
+        <option value="RESOLVED">Resolved</option>
+        <option value="CANCELLED">Cancelled</option>
+      </select>
+      <select aria-label="Sort requests" value={`${sortBy}-${sortDir}`} onChange={(event) => {
+        const [nextSortBy, nextSortDir] = event.target.value.split('-') as [string, 'asc' | 'desc']
+        setSortBy(nextSortBy)
+        setSortDir(nextSortDir)
+        setPage(0)
+      }}>
+        <option value="createdAt-desc">Newest first</option>
+        <option value="createdAt-asc">Oldest first</option>
+        <option value="status-asc">Status (A → Z)</option>
+        <option value="status-desc">Status (Z → A)</option>
+        <option value="priority-desc">Priority</option>
+      </select>
     </div>}>
-      {loading ? <LoadingState /> : requests.length === 0 ? <EmptyState title={hasFilters ? 'No matching requests' : 'No maintenance requests'} detail={hasFilters ? 'Try another search or property filter.' : owner ? 'Tenant issues will appear here.' : 'You have not reported an issue for your leased property.'} action={!owner && leases.length > 0 && !hasFilters ? <button className="button button-primary" onClick={() => setCreateOpen(true)}><Plus size={14} /> New request</button> : undefined} /> : <>
+      {loading ? <LoadingState /> : requests.length === 0 ? <EmptyState title={hasFilters ? 'No matching requests' : 'No maintenance requests'} detail={hasFilters ? 'Try another search, property, or status filter.' : owner ? 'Tenant issues will appear here.' : 'You have not reported an issue for your leased property.'} action={!owner && leases.length > 0 && !hasFilters ? <button className="button button-primary" onClick={() => setCreateOpen(true)}><Plus size={14} /> New request</button> : undefined} /> : <>
         <div className="table-scroll">
           <table className="notice-table maintenance-table">
-            <thead><tr><th>Issue</th><th>Property</th><th>Reported by</th><th>Priority</th><th>Status</th><th>Created</th><th>Action</th></tr></thead>
+            <thead><tr>
+              <th>Issue</th>
+              <th>Property</th>
+              <th>Reported by</th>
+              <th>Priority</th>
+              <th
+                className="sortable-header"
+                onClick={toggleStatusSort}
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+                title="Click to sort by status"
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  Status
+                  {sortBy === 'status' ? (
+                    sortDir === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                  ) : (
+                    <ArrowUpDown size={14} style={{ opacity: 0.4 }} />
+                  )}
+                </span>
+              </th>
+              <th>Created</th>
+              <th>Action</th>
+            </tr></thead>
             <tbody>{requests.map((request) => {
               const detailPath = `/${owner ? 'owner' : 'tenant'}/maintenance/${request.id}`
               return <tr key={request.id}>

@@ -194,7 +194,18 @@ export const api = {
   async propertyMaintenance(token: string, id: number) {
     return (await client(token).get<MaintenanceRequest[]>(`/api/maintenance/property/${id}`)).data
   },
-  async maintenancePage(token: string, params: { page: number; size: number; search?: string; propertyId?: number }) {
+  async maintenancePage(
+    token: string,
+    params: {
+      page: number
+      size: number
+      search?: string
+      propertyId?: number
+      status?: string
+      sortBy?: string
+      sortDir?: 'asc' | 'desc'
+    }
+  ) {
     return (await client(token).get<ApiPage<MaintenanceRequest>>('/api/maintenance/page', { params })).data
   },
   async maintenanceRequest(token: string, id: number) {
