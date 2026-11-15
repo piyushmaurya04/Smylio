@@ -205,7 +205,7 @@ export function TenantRentPage() {
 
   return <section className="page-section">
     <PageHeading eyebrow="TENANT PORTAL" title="Rent & payments" subtitle="Your outstanding balance and complete payment history." action={<button className="button" onClick={() => void load()}><RefreshCw size={14} /> Refresh</button>} />
-    {error && <InlineError>{error}</InlineError>}{message && <div className="alert alert-success" role="status">{message}</div>}
+    {!paymentConfirmation && error && <InlineError>{error}</InlineError>}{message && <div className="alert alert-success" role="status">{message}</div>}
     {loading || !summary ? <LoadingState /> : <>
       <div className="stats-grid stats-grid-tenant"><StatCard label="Total due" value={formatCurrency(summary.totalDue)} detail="Rent plus accrued fines" tone={summary.totalDue ? 'warning' : 'accent'} /><StatCard label="Next due date" value={formatDate(summary.nextDueDate)} detail="Earliest unpaid item" /><StatCard label="Payment records" value={String(summary.history.length)} detail="Across your leases" /></div>
       <Panel title="Outstanding rent" description="Pay online now or submit a cash claim for owner approval.">

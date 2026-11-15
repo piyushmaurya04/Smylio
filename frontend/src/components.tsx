@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
+import { errorMessage } from './api'
 import { isNoticeUnread, NOTICE_READ_EVENT, timeUntilNoticeExpires } from './notice-status'
 
 export function PageHeading({ eyebrow, title, subtitle, action }: { eyebrow: string; title: string; subtitle?: string; action?: ReactNode }) {
@@ -61,7 +62,15 @@ export function DataTable({ children, headings }: { children: ReactNode; heading
   return <div className="table-scroll"><table><thead><tr>{headings.map((heading) => <th key={heading}>{heading}</th>)}</tr></thead><tbody>{children}</tbody></table></div>
 }
 
-export function Modal({ title, description, onClose, children, wide = false, confirmation = false }: { title: string; description?: string; onClose: () => void; children: ReactNode; wide?: boolean; confirmation?: boolean }) {
+export function Modal({ title, description, onClose, children, wide = false, confirmation = false, error }: {
+  title: string
+  description?: string
+  onClose: () => void
+  children: ReactNode
+  wide?: boolean
+  confirmation?: boolean
+  error?: string
+}) {
   useEffect(() => {
     function onKey(event: KeyboardEvent) { if (event.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKey)
@@ -72,20 +81,31 @@ export function Modal({ title, description, onClose, children, wide = false, con
   return <div className={`modal-backdrop ${confirmation ? 'modal-confirmation-backdrop' : ''}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
     <section className={`modal ${wide ? 'modal-wide' : ''} ${confirmation ? 'modal-confirmation' : ''}`} role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <header className="modal-header"><div><h2 id="modal-title">{title}</h2>{description && <p>{description}</p>}</div><button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}><X size={17} /></button></header>
-      <div className="modal-content">{children}</div>
+      <div className="modal-content">
+        {error && <InlineError>{error}</InlineError>}
+        {children}
+      </div>
     </section>
   </div>
 }
 
 export function ConfirmationDialog({ title, description, confirmLabel, onConfirm, onCancel }: { title: string; description: string; confirmLabel: string; onConfirm: () => void | Promise<void>; onCancel: () => void }) {
   const [busy, setBusy] = useState(false)
+  const [dialogError, setDialogError] = useState('')
 
   async function confirm() {
     setBusy(true)
-    try { await onConfirm() } finally { setBusy(false) }
+    setDialogError('')
+    try {
+      await onConfirm()
+    } catch (cause) {
+      setDialogError(errorMessage(cause))
+    } finally {
+      setBusy(false)
+    }
   }
 
-  return <Modal title={title} description={description} onClose={onCancel} confirmation>
+  return <Modal title={title} description={description} onClose={onCancel} confirmation error={dialogError}>
     <div className="modal-actions"><button type="button" className="button" disabled={busy} onClick={onCancel}>Cancel</button><button type="button" className="button button-danger" disabled={busy} onClick={() => void confirm()}>{busy ? <span className="spinner" /> : null}{confirmLabel}</button></div>
   </Modal>
 }

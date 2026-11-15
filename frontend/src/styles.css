@@ -269,6 +269,7 @@ td strong { display: block; font-size: 14px; font-weight: 600; }
 .modal-header h2 { margin: 0; font-family: Manrope, sans-serif; font-size: 19px; font-weight: 700; }
 .modal-header p { margin: 5px 0 0; color: var(--muted); font-size: 12.7px; }
 .modal-content { padding: 19px 20px 20px; }
+.modal-content > .alert { margin-bottom: 16px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 3px; }
 .modal-confirmation-backdrop { align-items: start; padding-top: clamp(18px, 8vh, 76px); }
 .modal-confirmation { animation: confirmation-drop .24s cubic-bezier(.2, .8, .2, 1); }

@@ -138,11 +138,11 @@ export function OwnerPropertiesPage() {
   }
 
   return <section className="page-section">
-    <PageHeading eyebrow="PORTFOLIO" title="Properties" subtitle="Manage rental details and amenities for your portfolio." action={<button className="button button-primary" onClick={() => setModal('new')}><Plus size={15} /> Add property</button>} />
-    {error && <InlineError>{error}</InlineError>}{notice && <InlineSuccess>{notice}</InlineSuccess>}
+    <PageHeading eyebrow="PORTFOLIO" title="Properties" subtitle="Manage rental details and amenities for your portfolio." action={<button className="button button-primary" onClick={() => { setError(''); setModal('new') }}><Plus size={15} /> Add property</button>} />
+    {!modal && error && <InlineError>{error}</InlineError>}{notice && <InlineSuccess>{notice}</InlineSuccess>}
     <Panel title="Your properties" description={`${properties.length} properties`}>
       {loading ? <LoadingState /> : properties.length === 0 ? <EmptyState title="No properties yet" detail="Add your first property to start managing leases and rent." action={<button className="button button-primary" onClick={() => setModal('new')}><Plus size={14} /> Add property</button>} /> : <DataTable headings={['Property', 'Type', 'Rent / month', 'Amenities', 'Status', '']}>
-        {properties.map((property) => <tr key={property.id}><td><strong>{property.title}</strong><small className="table-secondary">{property.address}</small></td><td>{property.type}</td><td>{formatCurrency(property.rentAmount)}</td><td><span className="amenity-summary">{property.amenities?.length ? property.amenities.join(', ') : '—'}</span></td><td><StatusBadge status={property.status} /></td><td className="table-actions"><button className="button button-small" onClick={() => setModal(property)}>Edit</button><button className="icon-action" aria-label={`Delete ${property.title}`} disabled={deleting === property.id} title="Delete property" onClick={() => setPropertyToDelete(property)}><Trash2 size={15} /></button></td></tr>)}
+        {properties.map((property) => <tr key={property.id}><td><strong>{property.title}</strong><small className="table-secondary">{property.address}</small></td><td>{property.type}</td><td>{formatCurrency(property.rentAmount)}</td><td><span className="amenity-summary">{property.amenities?.length ? property.amenities.join(', ') : '—'}</span></td><td><StatusBadge status={property.status} /></td><td className="table-actions"><button className="button button-small" onClick={() => { setError(''); setModal(property) }}>Edit</button><button className="icon-action" aria-label={`Delete ${property.title}`} disabled={deleting === property.id} title="Delete property" onClick={() => setPropertyToDelete(property)}><Trash2 size={15} /></button></td></tr>)}
       </DataTable>}
     </Panel>
     {modal && <Modal title={modal === 'new' ? 'Add property' : 'Edit property'} description="Property details and amenities" onClose={() => setModal(null)}><PropertyForm initial={modal === 'new' ? undefined : modal} onCancel={() => setModal(null)} onSave={save} /></Modal>}
@@ -156,6 +156,7 @@ export function OwnerLeasesPage() {
   const [properties, setProperties] = useState<Property[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [modalError, setModalError] = useState('')
   const [notice, setNotice] = useState('')
   const [open, setOpen] = useState(false)
   const [code, setCode] = useState('')
@@ -172,20 +173,20 @@ export function OwnerLeasesPage() {
   useEffect(() => { void load() }, [load])
 
   async function searchTenant() {
-    if (!token || !code.trim()) { setError('Enter a tenant code.'); return }
-    setBusy(true); setError(''); setTenant(null)
-    try { setTenant(await api.findTenant(token, code.trim())) } catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
+    if (!token || !code.trim()) { setModalError('Enter a tenant code.'); return }
+    setBusy(true); setModalError(''); setTenant(null)
+    try { setTenant(await api.findTenant(token, code.trim())) } catch (cause) { setModalError(errorMessage(cause)) } finally { setBusy(false) }
   }
 
   async function assign(event: React.FormEvent) {
     event.preventDefault()
     if (!token || !tenant) return
-    if (!form.propertyId || !form.startDate || Number(form.monthlyRent) <= 0) { setError('Select a property, start date, and valid monthly rent.'); return }
-    setBusy(true); setError('')
+    if (!form.propertyId || !form.startDate || Number(form.monthlyRent) <= 0) { setModalError('Select a property, start date, and valid monthly rent.'); return }
+    setBusy(true); setModalError('')
     try {
       await api.createLease(token, { propertyId: Number(form.propertyId), tenantCode: tenant.tenantCode || code.trim(), startDate: form.startDate, monthlyRent: Number(form.monthlyRent), fineGraceDays: Number(form.fineGraceDays), finePerDay: Number(form.finePerDay) })
-      setNotice(`Lease created for ${tenant.name}.`); setOpen(false); setTenant(null); setCode(''); await load()
-    } catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
+      setNotice(`Lease created for ${tenant.name}.`); setOpen(false); setTenant(null); setCode(''); setModalError(''); await load()
+    } catch (cause) { setModalError(errorMessage(cause)) } finally { setBusy(false) }
   }
 
   async function end(id: number): Promise<boolean> {
@@ -195,21 +196,21 @@ export function OwnerLeasesPage() {
   }
 
   return <section className="page-section">
-    <PageHeading eyebrow="OCCUPANCY" title="Tenants & leases" subtitle="Find a registered tenant by code and assign them to one of your properties." action={<button className="button button-primary" onClick={() => setOpen(true)}><Plus size={15} /> Assign tenant</button>} />
-    {error && <InlineError>{error}</InlineError>}{notice && <InlineSuccess>{notice}</InlineSuccess>}
+    <PageHeading eyebrow="OCCUPANCY" title="Tenants & leases" subtitle="Find a registered tenant by code and assign them to one of your properties." action={<button className="button button-primary" onClick={() => { setError(''); setModalError(''); setOpen(true) }}><Plus size={15} /> Assign tenant</button>} />
+    {!open && error && <InlineError>{error}</InlineError>}{notice && <InlineSuccess>{notice}</InlineSuccess>}
     <Panel title="Lease register" description={`${leases.length} leases, including history`}>
       {loading ? <LoadingState /> : leases.length === 0 ? <EmptyState title="No leases yet" detail="Assign a registered tenant to one of your properties." /> : <DataTable headings={['Tenant', 'Property', 'Start date', 'Monthly rent', 'Lease', 'Action']}>
         {leases.map((lease) => <tr key={lease.id}><td><Link className="tenant-lease-link" to={`/owner/leases/tenants/${lease.tenantId}?propertyId=${lease.propertyId}`}><strong>{lease.tenantName}</strong><small className="table-secondary">{lease.tenantCode}</small></Link></td><td><strong>{lease.propertyTitle}</strong>{lease.amenities?.length > 0 && <small className="table-secondary">{lease.amenities.join(' · ')}</small>}</td><td>{formatDate(lease.startDate)}</td><td>{formatCurrency(lease.monthlyRent)}</td><td><StatusBadge status={lease.status} /></td><td><span className="notice-table-actions"><Link className="notice-table-action notice-table-open" to={`/owner/leases/tenants/${lease.tenantId}?propertyId=${lease.propertyId}`} aria-label={`View ${lease.tenantName} details for ${lease.propertyTitle}`} title="View tenant details"><Eye size={16} /></Link>{lease.status === 'ACTIVE' && <button className="button button-small button-danger" disabled={busy} onClick={() => setLeaseToEnd(lease)}>End lease</button>}</span></td></tr>)}
       </DataTable>}
     </Panel>
-    {open && <Modal title="Assign a tenant" description="Tenant assignment creates an active lease." onClose={() => { setOpen(false); setTenant(null); setError('') }}>
+    {open && <Modal title="Assign a tenant" description="Tenant assignment creates an active lease." onClose={() => { setOpen(false); setTenant(null); setModalError('') }} error={modalError}>
       <form className="form-stack" onSubmit={assign} noValidate>
         <div className="field-group"><label htmlFor="tenant-code">Tenant code <span className="required-mark">*</span></label><div className="inline-field"><input id="tenant-code" value={code} onChange={(event) => { setCode(event.target.value); setTenant(null) }} placeholder="TNT-123" required /><button type="button" className="button" disabled={busy} onClick={() => void searchTenant()}><Search size={14} /> Find</button></div><span className="field-help">The tenant must have a registered account.</span></div>
         {tenant && <div className="tenant-confirm"><span className="workspace-avatar">{tenant.name.slice(0, 1)}</span><div><strong>{tenant.name}</strong><small>{tenant.maskedPhone} · {tenant.tenantCode}</small></div></div>}
         <div className="field-group"><label htmlFor="lease-property">Property <span className="required-mark">*</span></label><select id="lease-property" value={form.propertyId} onChange={(event) => { const selected = properties.find((property) => property.id === Number(event.target.value)); setForm((current) => ({ ...current, propertyId: event.target.value, monthlyRent: selected?.rentAmount?.toString() || current.monthlyRent })) }} required><option value="">Choose available property</option>{properties.filter((property) => property.status === 'AVAILABLE').map((property) => <option key={property.id} value={property.id}>{property.title} · {property.address}</option>)}</select></div>
         <div className="form-grid"><Field label="Start date" id="lease-start" type="date" value={form.startDate} onChange={(value) => setForm((current) => ({ ...current, startDate: value }))} required /><Field label="Monthly rent" id="lease-rent" type="number" min="0.01" step="0.01" value={form.monthlyRent} onChange={(value) => setForm((current) => ({ ...current, monthlyRent: value }))} required /></div>
         <div className="form-grid"><Field label="Fine grace days" id="lease-grace" type="number" min="0" step="1" value={form.fineGraceDays} onChange={(value) => setForm((current) => ({ ...current, fineGraceDays: value }))} /><Field label="Fine per day" id="lease-fine" type="number" min="0" step="0.01" value={form.finePerDay} onChange={(value) => setForm((current) => ({ ...current, finePerDay: value }))} /></div>
-        <div className="modal-actions"><button type="button" className="button" onClick={() => setOpen(false)}>Cancel</button><button className="button button-primary" disabled={busy || !tenant}>{busy ? <span className="spinner" /> : null}Create lease</button></div>
+        <div className="modal-actions"><button type="button" className="button" onClick={() => { setOpen(false); setTenant(null); setModalError('') }}>Cancel</button><button className="button button-primary" disabled={busy || !tenant}>{busy ? <span className="spinner" /> : null}Create lease</button></div>
       </form>
     </Modal>}
     {leaseToEnd && <ConfirmationDialog title="End this lease?" description={`The lease for ${leaseToEnd.tenantName} at ${leaseToEnd.propertyTitle} will end. Its history will be retained.`} confirmLabel="End lease" onCancel={() => setLeaseToEnd(null)} onConfirm={async () => { await end(leaseToEnd.id); setLeaseToEnd(null) }} />}
