@@ -76,7 +76,13 @@ function client(token?: string): AxiosInstance {
 export function errorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const body = error.response?.data as { message?: string; error?: string } | undefined
-    return body?.message || body?.error || error.message || 'The request could not be completed.'
+    if (body?.message) return body.message
+    if (body?.error) return body.error
+    if (error.response?.status === 403) return 'Access denied or invalid credentials.'
+    if (error.response?.status === 401) return 'Session expired or invalid credentials.'
+    if (error.response?.status === 404) return 'The requested resource was not found.'
+    if (error.response?.status === 500) return 'A server error occurred. Please try again later.'
+    return error.message || 'The request could not be completed.'
   }
   return error instanceof Error ? error.message : 'The request could not be completed.'
 }
@@ -109,6 +115,9 @@ export const api = {
   },
   async updateProfile(token: string, body: Pick<User, 'name' | 'email' | 'phone'>) {
     return (await client(token).put<User>('/api/profile', body)).data
+  },
+  async changePassword(token: string, body: { currentPassword: string; newPassword: string }) {
+    return (await client(token).put<{ message: string }>('/api/profile/password', body)).data
   },
   async properties(token: string) {
     return (await client(token).get<Property[]>('/api/properties')).data
@@ -194,7 +203,18 @@ export const api = {
   async propertyMaintenance(token: string, id: number) {
     return (await client(token).get<MaintenanceRequest[]>(`/api/maintenance/property/${id}`)).data
   },
-  async maintenancePage(token: string, params: { page: number; size: number; search?: string; propertyId?: number }) {
+  async maintenancePage(
+    token: string,
+    params: {
+      page: number
+      size: number
+      search?: string
+      propertyId?: number
+      status?: string
+      sortBy?: string
+      sortDir?: 'asc' | 'desc'
+    }
+  ) {
     return (await client(token).get<ApiPage<MaintenanceRequest>>('/api/maintenance/page', { params })).data
   },
   async maintenanceRequest(token: string, id: number) {

@@ -58,6 +58,10 @@ public class SecurityConfiguration {
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             @Value("${app.cors.enabled:false}") boolean corsEnabled) throws Exception {
+        // CSRF is disabled globally because all authenticated API endpoints use stateless Authorization: Bearer JWTs.
+        // The cookie-based auth endpoints (/api/auth/refresh and /api/auth/logout) are protected against CSRF via:
+        // 1. SameSite=Strict, HttpOnly, Secure, and Path=/api/auth cookie attributes.
+        // 2. AuthOriginValidatorFilter enforcing strict Origin, Referer, and Sec-Fetch-Site validation.
         http.csrf(AbstractHttpConfigurer::disable);
         if (corsEnabled) {
             http.cors(Customizer.withDefaults());
@@ -72,13 +76,13 @@ public class SecurityConfiguration {
                                 "/", "/index.html", "/assets/**", "/favicon.ico",
                                 "/brand/**",
                                 "/login", "/register", "/profile", "/faq", "/help",
-                                "/owner/**", "/tenant/**", "/actuator/health")
+                                "/owner/**", "/tenant/**", "/actuator/health", "/error")
                         .permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout")
                         .permitAll()
                         .requestMatchers("/api/auth/**").denyAll()
-                        .requestMatchers("/api/profile/**").hasAnyRole("OWNER", "TENANT")
+                        .requestMatchers("/api/profile", "/api/profile/**").hasAnyRole("OWNER", "TENANT")
                         .requestMatchers("/api/properties/**").hasRole("OWNER")
                         .requestMatchers("/api/leases/**").hasRole("OWNER")
                         .requestMatchers("/api/tenants/**").hasRole("OWNER")

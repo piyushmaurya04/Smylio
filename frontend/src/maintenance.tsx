@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Ban, ChevronLeft, ChevronRight, Eye, Pencil, Plus, Search, Send } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Ban, ChevronLeft, ChevronRight, Eye, Pencil, Plus, Search, Send } from 'lucide-react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, errorMessage } from './api'
 import { useAuth } from './auth-context'
@@ -18,6 +18,7 @@ export function MaintenancePage() {
   const [requests, setRequests] = useState<MaintenanceRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [modalError, setModalError] = useState('')
   const [notice, setNotice] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [editingRequest, setEditingRequest] = useState<MaintenanceRequest | null>(null)
@@ -26,6 +27,9 @@ export function MaintenancePage() {
   const [form, setForm] = useState({ title: '', description: '', priority: 'MEDIUM' })
   const [search, setSearch] = useState('')
   const [propertyFilter, setPropertyFilter] = useState(() => searchParams.get('propertyId') ?? '')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [sortBy, setSortBy] = useState('createdAt')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(0)
   const [total, setTotal] = useState(0)
   const [pageCount, setPageCount] = useState(0)
@@ -42,6 +46,9 @@ export function MaintenancePage() {
         size: pageSize,
         search: search.trim() || undefined,
         propertyId: propertyFilter ? Number(propertyFilter) : undefined,
+        status: statusFilter || undefined,
+        sortBy,
+        sortDir,
       })
       setRequests(result.content)
       setTotal(result.totalElements)
@@ -51,7 +58,7 @@ export function MaintenancePage() {
     } finally {
       setLoading(false)
     }
-  }, [token, page, search, propertyFilter])
+  }, [token, page, search, propertyFilter, statusFilter, sortBy, sortDir])
 
   useEffect(() => { void load() }, [load])
 
@@ -78,11 +85,11 @@ export function MaintenancePage() {
     event.preventDefault()
     if (!token) return
     if (!selectedProperty || !form.title.trim() || !form.description.trim()) {
-      setError('Choose a property and complete the title and description.')
+      setModalError('Choose a property and complete the title and description.')
       return
     }
     setBusy(-1)
-    setError('')
+    setModalError('')
     try {
       await api.createMaintenance(token, {
         propertyId: Number(selectedProperty),
@@ -93,10 +100,11 @@ export function MaintenancePage() {
       setNotice('Maintenance request submitted.')
       setCreateOpen(false)
       setForm({ title: '', description: '', priority: 'MEDIUM' })
+      setModalError('')
       setPage(0)
       if (page === 0) await load()
     } catch (cause) {
-      setError(errorMessage(cause))
+      setModalError(errorMessage(cause))
     } finally {
       setBusy(null)
     }
@@ -121,8 +129,12 @@ export function MaintenancePage() {
   async function saveRequestChanges(event: FormEvent) {
     event.preventDefault()
     if (!token || !editingRequest) return
+    if (!form.title.trim() || !form.description.trim()) {
+      setModalError('Enter a title and description.')
+      return
+    }
     setBusy(editingRequest.id)
-    setError('')
+    setModalError('')
     try {
       await api.updateMaintenance(token, editingRequest.id, {
         ...form,
@@ -131,9 +143,10 @@ export function MaintenancePage() {
       })
       setNotice('Maintenance request updated.')
       setEditingRequest(null)
+      setModalError('')
       await load()
     } catch (cause) {
-      setError(errorMessage(cause))
+      setModalError(errorMessage(cause))
     } finally {
       setBusy(null)
     }
@@ -155,24 +168,78 @@ export function MaintenancePage() {
     }
   }
 
-  const hasFilters = Boolean(search.trim() || propertyFilter)
+  const hasFilters = Boolean(search.trim() || propertyFilter || statusFilter || sortBy !== 'createdAt')
   const shownStart = total === 0 ? 0 : page * pageSize + 1
   const shownEnd = Math.min((page + 1) * pageSize, total)
 
+  function toggleStatusSort() {
+    setPage(0)
+    if (sortBy !== 'status') {
+      setSortBy('status')
+      setSortDir('asc')
+    } else if (sortDir === 'asc') {
+      setSortDir('desc')
+    } else {
+      setSortBy('createdAt')
+      setSortDir('desc')
+    }
+  }
+
   return <section className="page-section">
-    <PageHeading eyebrow="PROPERTY CARE" title="Maintenance" subtitle={owner ? 'Track and resolve tenant-reported property issues.' : 'Report an issue and follow its progress.'} action={!owner && leases.length > 0 ? <button className="button button-primary" onClick={() => setCreateOpen(true)}><Plus size={15} /> New request</button> : undefined} />
-    {error && <InlineError>{error}</InlineError>}{notice && <InlineSuccess>{notice}</InlineSuccess>}
+    <PageHeading eyebrow="PROPERTY CARE" title="Maintenance" subtitle={owner ? 'Track and resolve tenant-reported property issues.' : 'Report an issue and follow its progress.'} action={!owner && leases.length > 0 ? <button className="button button-primary" onClick={() => { setError(''); setModalError(''); setCreateOpen(true) }}><Plus size={15} /> New request</button> : undefined} />
+    {!createOpen && !editingRequest && error && <InlineError>{error}</InlineError>}{notice && <InlineSuccess onDismiss={() => setNotice('')}>{notice}</InlineSuccess>}
     <Panel title={owner ? 'Requests across your properties' : 'My requests'} description={`${total} requests`} action={<div className="notice-table-filters">
       <label className="notice-search-field" htmlFor="maintenance-search"><Search size={16} /><input id="maintenance-search" type="search" placeholder="Search requests..." value={search} onChange={(event) => { setSearch(event.target.value); setPage(0) }} /></label>
       <select aria-label="Filter requests by property" value={propertyFilter} onChange={(event) => { setPropertyFilter(event.target.value); setPage(0) }}>
         <option value="">All properties</option>
         {properties.map((property) => <option key={property.id} value={property.id}>{property.title}</option>)}
       </select>
+      <select aria-label="Filter requests by status" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(0) }}>
+        <option value="">All statuses</option>
+        <option value="OPEN">Open</option>
+        <option value="IN_PROGRESS">In progress</option>
+        <option value="RESOLVED">Resolved</option>
+        <option value="CANCELLED">Cancelled</option>
+      </select>
+      <select aria-label="Sort requests" value={`${sortBy}-${sortDir}`} onChange={(event) => {
+        const [nextSortBy, nextSortDir] = event.target.value.split('-') as [string, 'asc' | 'desc']
+        setSortBy(nextSortBy)
+        setSortDir(nextSortDir)
+        setPage(0)
+      }}>
+        <option value="createdAt-desc">Newest first</option>
+        <option value="createdAt-asc">Oldest first</option>
+        <option value="status-asc">Status (A → Z)</option>
+        <option value="status-desc">Status (Z → A)</option>
+        <option value="priority-desc">Priority</option>
+      </select>
     </div>}>
-      {loading ? <LoadingState /> : requests.length === 0 ? <EmptyState title={hasFilters ? 'No matching requests' : 'No maintenance requests'} detail={hasFilters ? 'Try another search or property filter.' : owner ? 'Tenant issues will appear here.' : 'You have not reported an issue for your leased property.'} action={!owner && leases.length > 0 && !hasFilters ? <button className="button button-primary" onClick={() => setCreateOpen(true)}><Plus size={14} /> New request</button> : undefined} /> : <>
+      {loading ? <LoadingState /> : requests.length === 0 ? <EmptyState title={hasFilters ? 'No matching requests' : 'No maintenance requests'} detail={hasFilters ? 'Try another search, property, or status filter.' : owner ? 'Tenant issues will appear here.' : 'You have not reported an issue for your leased property.'} action={!owner && leases.length > 0 && !hasFilters ? <button className="button button-primary" onClick={() => { setError(''); setModalError(''); setCreateOpen(true) }}><Plus size={14} /> New request</button> : undefined} /> : <>
         <div className="table-scroll">
           <table className="notice-table maintenance-table">
-            <thead><tr><th>Issue</th><th>Property</th><th>Reported by</th><th>Priority</th><th>Status</th><th>Created</th><th>Action</th></tr></thead>
+            <thead><tr>
+              <th>Issue</th>
+              <th>Property</th>
+              <th>Reported by</th>
+              <th>Priority</th>
+              <th
+                className="sortable-header"
+                onClick={toggleStatusSort}
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+                title="Click to sort by status"
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  Status
+                  {sortBy === 'status' ? (
+                    sortDir === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                  ) : (
+                    <ArrowUpDown size={14} style={{ opacity: 0.4 }} />
+                  )}
+                </span>
+              </th>
+              <th>Created</th>
+              <th>Action</th>
+            </tr></thead>
             <tbody>{requests.map((request) => {
               const detailPath = `/${owner ? 'owner' : 'tenant'}/maintenance/${request.id}`
               return <tr key={request.id}>
@@ -182,7 +249,7 @@ export function MaintenancePage() {
                 <td><StatusBadge status={request.priority} /></td>
                 <td>{owner && request.status !== 'CANCELLED' && request.status !== 'RESOLVED' ? <select className="compact-select" aria-label={`Update status for ${request.title}`} value={request.status} disabled={busy === request.id} onChange={(event) => setPendingStatus({ request, status: event.target.value as MaintenanceRequest['status'] })}>{request.status === 'OPEN' && <option value="OPEN">Open</option>}{request.status === 'OPEN' && <option value="IN_PROGRESS">In progress</option>}{request.status === 'IN_PROGRESS' && <option value="IN_PROGRESS">In progress</option>}<option value="RESOLVED">Resolved</option></select> : <StatusBadge status={request.status} />}</td>
                 <td>{formatDate(request.createdAt)}</td>
-                <td>{owner ? <Link className="notice-table-view" to={detailPath}>View details <ChevronRight size={16} /></Link> : <span className="notice-table-actions"><Link className="notice-table-action notice-table-open" to={detailPath} aria-label={`View request: ${request.title}`} title="View request"><Eye size={16} /></Link><button className="notice-table-action notice-table-edit" type="button" disabled={request.status === 'RESOLVED' || request.status === 'CANCELLED'} onClick={() => { setEditingRequest(request); setForm({ title: request.title, description: request.description, priority: request.priority }) }} aria-label={`Edit request: ${request.title}`} title={request.status === 'RESOLVED' || request.status === 'CANCELLED' ? 'Closed requests cannot be edited' : 'Edit request'}><Pencil size={16} /></button>{request.status === 'OPEN' && <button className="notice-table-action notice-table-delete" type="button" onClick={() => setRequestToCancel(request)} aria-label={`Cancel request: ${request.title}`} title="Cancel request"><Ban size={16} /></button>}</span>}</td>
+                <td>{owner ? <Link className="notice-table-view" to={detailPath}>View details <ChevronRight size={16} /></Link> : <span className="notice-table-actions"><Link className="notice-table-action notice-table-open" to={detailPath} aria-label={`View request: ${request.title}`} title="View request"><Eye size={16} /></Link><button className="notice-table-action notice-table-edit" type="button" disabled={request.status === 'RESOLVED' || request.status === 'CANCELLED'} onClick={() => { setError(''); setModalError(''); setEditingRequest(request); setForm({ title: request.title, description: request.description, priority: request.priority }) }} aria-label={`Edit request: ${request.title}`} title={request.status === 'RESOLVED' || request.status === 'CANCELLED' ? 'Closed requests cannot be edited' : 'Edit request'}><Pencil size={16} /></button>{request.status === 'OPEN' && <button className="notice-table-action notice-table-delete" type="button" onClick={() => setRequestToCancel(request)} aria-label={`Cancel request: ${request.title}`} title="Cancel request"><Ban size={16} /></button>}</span>}</td>
               </tr>
             })}</tbody>
           </table>
@@ -198,21 +265,21 @@ export function MaintenancePage() {
       </>}
     </Panel>
     {pendingStatus && <ConfirmationDialog title={pendingStatus.status === 'RESOLVED' ? 'Resolve this request?' : 'Move this request in progress?'} description={`The status of “${pendingStatus.request.title}” will change to ${pendingStatus.status === 'RESOLVED' ? 'Resolved' : 'In progress'}. This status cannot be changed back.`} confirmLabel={pendingStatus.status === 'RESOLVED' ? 'Resolve request' : 'Mark in progress'} onCancel={() => setPendingStatus(null)} onConfirm={() => void updateStatus(pendingStatus.request, pendingStatus.status)} />}
-    {createOpen && <Modal title="Report a maintenance issue" description="Your property owner will be notified." onClose={() => setCreateOpen(false)}>
+    {createOpen && <Modal title="Report a maintenance issue" description="Your property owner will be notified." onClose={() => { setCreateOpen(false); setModalError('') }} error={modalError}>
       <form className="form-stack" onSubmit={createRequest} noValidate>
         <div className="field-group"><label htmlFor="issue-property">Property <span className="required-mark">*</span></label><select id="issue-property" value={selectedProperty} onChange={(event) => setSelectedProperty(event.target.value)} required><option value="">Choose an active lease</option>{leases.map((lease) => <option key={lease.id} value={lease.propertyId}>{lease.propertyTitle}</option>)}</select></div>
         <Field label="Title" id="issue-title" value={form.title} onChange={(value) => setForm((current) => ({ ...current, title: value }))} required />
         <div className="field-group"><label htmlFor="issue-description">Description <span className="required-mark">*</span></label><textarea id="issue-description" value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} rows={4} required /></div>
         <div className="field-group"><label htmlFor="issue-priority">Priority <span className="required-mark">*</span></label><select id="issue-priority" value={form.priority} onChange={(event) => setForm((current) => ({ ...current, priority: event.target.value }))} required><option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option></select></div>
-        <div className="modal-actions"><button type="button" className="button" onClick={() => setCreateOpen(false)}>Cancel</button><button className="button button-primary" disabled={busy === -1}>{busy === -1 ? <span className="spinner" /> : null}Submit request</button></div>
+        <div className="modal-actions"><button type="button" className="button" onClick={() => { setCreateOpen(false); setModalError('') }}>Cancel</button><button className="button button-primary" disabled={busy === -1}>{busy === -1 ? <span className="spinner" /> : null}Submit request</button></div>
       </form>
     </Modal>}
-    {editingRequest && <Modal title="Edit maintenance request" description="Update your issue title, description, or priority." onClose={() => setEditingRequest(null)}>
+    {editingRequest && <Modal title="Edit maintenance request" description="Update your issue title, description, or priority." onClose={() => { setEditingRequest(null); setModalError('') }} error={modalError}>
       <form className="form-stack" onSubmit={saveRequestChanges} noValidate>
         <Field label="Title" id="maintenance-list-title" value={form.title} onChange={(value) => setForm((current) => ({ ...current, title: value }))} required />
         <div className="field-group"><label htmlFor="maintenance-list-description">Description <span className="required-mark">*</span></label><textarea id="maintenance-list-description" rows={4} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} required /></div>
         <div className="field-group"><label htmlFor="maintenance-list-priority">Priority <span className="required-mark">*</span></label><select id="maintenance-list-priority" value={form.priority} onChange={(event) => setForm((current) => ({ ...current, priority: event.target.value }))} required><option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option></select></div>
-        <div className="modal-actions"><button type="button" className="button" onClick={() => setEditingRequest(null)}>Cancel</button><button className="button button-primary" disabled={busy === editingRequest.id}>{busy === editingRequest.id ? <span className="spinner" /> : null}Save changes</button></div>
+        <div className="modal-actions"><button type="button" className="button" onClick={() => { setEditingRequest(null); setModalError('') }}>Cancel</button><button className="button button-primary" disabled={busy === editingRequest.id}>{busy === editingRequest.id ? <span className="spinner" /> : null}Save changes</button></div>
       </form>
     </Modal>}
     {requestToCancel && <ConfirmationDialog title={`Cancel “${requestToCancel.title}”?`} description="You can cancel this request only while it is open." confirmLabel="Cancel request" onCancel={() => setRequestToCancel(null)} onConfirm={() => void cancelTenantRequest()} />}
@@ -230,6 +297,7 @@ export function MaintenanceDetailPage() {
   const [commentDraft, setCommentDraft] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [modalError, setModalError] = useState('')
   const [success, setSuccess] = useState('')
   const [busy, setBusy] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
@@ -294,15 +362,20 @@ export function MaintenanceDetailPage() {
   async function saveChanges(event: FormEvent) {
     event.preventDefault()
     if (!token || !request) return
+    if (!form.title.trim() || !form.description.trim()) {
+      setModalError('Enter a title and description.')
+      return
+    }
     setBusy(true)
-    setError('')
+    setModalError('')
     try {
       await api.updateMaintenance(token, id, { ...form, title: form.title.trim(), description: form.description.trim() })
       setSuccess('Maintenance request updated.')
       setEditOpen(false)
+      setModalError('')
       await load()
     } catch (cause) {
-      setError(errorMessage(cause))
+      setModalError(errorMessage(cause))
     } finally {
       setBusy(false)
     }
@@ -326,8 +399,8 @@ export function MaintenanceDetailPage() {
 
   return <section className="page-section">
     {loading ? <Panel title="Maintenance request"><LoadingState /></Panel> : error && !request ? <><InlineError>{error}</InlineError><Link className="button" to={`/${owner ? 'owner' : 'tenant'}/maintenance`}>Back to maintenance</Link></> : request ? <>
-      <PageHeading eyebrow="PROPERTY CARE" title="Maintenance request" subtitle={`Request #${request.id} · ${request.status.replace('_', ' ')}`} action={!owner ? <div className="notice-table-actions">{request.status === 'OPEN' && <button className="button notice-delete-button" onClick={() => setCancelOpen(true)}><Ban size={14} /> Cancel request</button>}<button className="button" disabled={request.status === 'RESOLVED' || request.status === 'CANCELLED'} title={request.status === 'RESOLVED' || request.status === 'CANCELLED' ? 'Closed requests cannot be edited' : 'Edit request'} onClick={() => setEditOpen(true)}><Pencil size={14} /> Edit</button></div> : undefined} />
-      {error && <InlineError>{error}</InlineError>}{success && <InlineSuccess>{success}</InlineSuccess>}
+      <PageHeading eyebrow="PROPERTY CARE" title="Maintenance request" subtitle={`Request #${request.id} · ${request.status.replace('_', ' ')}`} action={!owner ? <div className="notice-table-actions">{request.status === 'OPEN' && <button className="button notice-delete-button" onClick={() => setCancelOpen(true)}><Ban size={14} /> Cancel request</button>}<button className="button" disabled={request.status === 'RESOLVED' || request.status === 'CANCELLED'} title={request.status === 'RESOLVED' || request.status === 'CANCELLED' ? 'Closed requests cannot be edited' : 'Edit request'} onClick={() => { setError(''); setModalError(''); setEditOpen(true) }}><Pencil size={14} /> Edit</button></div> : undefined} />
+      {!editOpen && error && <InlineError>{error}</InlineError>}{success && <InlineSuccess onDismiss={() => setSuccess('')}>{success}</InlineSuccess>}
       {!owner && request.status === 'OPEN' && <div className="alert alert-info maintenance-cancel-hint" role="note">You can cancel this request only while its status is Open.</div>}
       <Panel title={request.title} description={`${request.propertyTitle} · Reported by ${owner ? request.tenantName : 'You'}`}>
         <div className="maintenance-detail-meta">
@@ -354,12 +427,12 @@ export function MaintenanceDetailPage() {
         </form>
       </Panel>
     </> : null}
-    {editOpen && request && <Modal title="Edit maintenance request" description="Update the issue title, description, or priority." onClose={() => setEditOpen(false)}>
+    {editOpen && request && <Modal title="Edit maintenance request" description="Update the issue title, description, or priority." onClose={() => { setEditOpen(false); setModalError('') }} error={modalError}>
       <form className="form-stack" onSubmit={saveChanges} noValidate>
         <Field label="Title" id="maintenance-title" value={form.title} onChange={(value) => setForm((current) => ({ ...current, title: value }))} required />
         <div className="field-group"><label htmlFor="maintenance-description">Description <span className="required-mark">*</span></label><textarea id="maintenance-description" rows={4} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} required /></div>
         <div className="field-group"><label htmlFor="maintenance-priority">Priority <span className="required-mark">*</span></label><select id="maintenance-priority" value={form.priority} onChange={(event) => setForm((current) => ({ ...current, priority: event.target.value }))} required><option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option></select></div>
-        <div className="modal-actions"><button type="button" className="button" onClick={() => setEditOpen(false)}>Cancel</button><button className="button button-primary" disabled={busy}>{busy ? <span className="spinner" /> : null}Save changes</button></div>
+        <div className="modal-actions"><button type="button" className="button" onClick={() => { setEditOpen(false); setModalError('') }}>Cancel</button><button className="button button-primary" disabled={busy}>{busy ? <span className="spinner" /> : null}Save changes</button></div>
       </form>
     </Modal>}
     {cancelOpen && request && <ConfirmationDialog title={`Cancel “${request.title}”?`} description="You can cancel this request only while it is open. Once cancelled, the owner will no longer process it." confirmLabel="Cancel request" onCancel={() => setCancelOpen(false)} onConfirm={() => void cancelRequest()} />}

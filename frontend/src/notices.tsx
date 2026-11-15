@@ -15,6 +15,7 @@ export function NoticesPage() {
   const [properties, setProperties] = useState<Array<{ id: number; title: string }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [modalError, setModalError] = useState('')
   const [success, setSuccess] = useState('')
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -51,6 +52,7 @@ export function NoticesPage() {
     setNoticeToEdit(notice)
     setForm({ title: notice.title, message: notice.message, propertyId: notice.propertyId ? String(notice.propertyId) : '' })
     setError('')
+    setModalError('')
     setOpen(true)
   }
 
@@ -58,13 +60,14 @@ export function NoticesPage() {
     setOpen(false)
     setNoticeToEdit(null)
     setForm({ title: '', message: '', propertyId: '' })
+    setModalError('')
   }
 
   async function saveNotice(event: React.FormEvent) {
     event.preventDefault()
     if (!token) return
-    if (!form.title.trim() || !form.message.trim()) { setError('Enter a title and message.'); return }
-    setBusy(true); setError('')
+    if (!form.title.trim() || !form.message.trim()) { setModalError('Enter a title and message.'); return }
+    setBusy(true); setModalError('')
     try {
       const body = { title: form.title.trim(), message: form.message.trim(), ...(form.propertyId ? { propertyId: Number(form.propertyId) } : {}) }
       if (noticeToEdit) {
@@ -80,7 +83,7 @@ export function NoticesPage() {
         setPage(1); setSearch(''); setPropertyFilter('')
         if (!shouldResetFilters) await load()
       }
-    } catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
+    } catch (cause) { setModalError(errorMessage(cause)) } finally { setBusy(false) }
   }
 
   async function removeNotice(notice: Notice) {
@@ -102,8 +105,8 @@ export function NoticesPage() {
   }, [page, totalPages])
 
   return <section className="page-section">
-    <PageHeading eyebrow="COMMUNICATIONS" title="Notices" subtitle={owner ? 'Share property updates with tenants.' : 'Updates from your property owner.'} action={owner ? <button className="button button-primary" onClick={() => { setNoticeToEdit(null); setForm({ title: '', message: '', propertyId: '' }); setOpen(true) }}><Plus size={15} /> Post notice</button> : <button className="button" onClick={() => void load()}><RefreshCw size={14} /> Refresh</button>} />
-    {error && <InlineError>{error}</InlineError>}{success && <InlineSuccess>{success}</InlineSuccess>}
+    <PageHeading eyebrow="COMMUNICATIONS" title="Notices" subtitle={owner ? 'Share property updates with tenants.' : 'Updates from your property owner.'} action={owner ? <button className="button button-primary" onClick={() => { setError(''); setModalError(''); setNoticeToEdit(null); setForm({ title: '', message: '', propertyId: '' }); setOpen(true) }}><Plus size={15} /> Post notice</button> : <button className="button" onClick={() => void load()}><RefreshCw size={14} /> Refresh</button>} />
+    {!open && error && <InlineError>{error}</InlineError>}{success && <InlineSuccess onDismiss={() => setSuccess('')}>{success}</InlineSuccess>}
     <Panel
       title={owner ? 'Your notices' : 'Notices for your home'}
       description={`${totalNotices} notices`}
@@ -167,7 +170,7 @@ export function NoticesPage() {
         </footer>
       </>}
     </Panel>
-    {open && <Modal title={noticeToEdit ? 'Edit notice' : 'Post a notice'} description={noticeToEdit ? 'Update the notice details for your tenants.' : 'Choose one property or leave it as a general notice for all your leased properties.'} onClose={closeForm}>
+    {open && <Modal title={noticeToEdit ? 'Edit notice' : 'Post a notice'} description={noticeToEdit ? 'Update the notice details for your tenants.' : 'Choose one property or leave it as a general notice for all your leased properties.'} onClose={closeForm} error={modalError}>
       <form className="form-stack" onSubmit={saveNotice} noValidate>
         <Field label="Title" id="notice-title" value={form.title} onChange={(value) => setForm((current) => ({ ...current, title: value }))} required />
         <div className="field-group"><label htmlFor="notice-message">Message <span className="required-mark">*</span></label><textarea id="notice-message" rows={4} value={form.message} onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))} required /></div>
@@ -189,6 +192,7 @@ export function NoticeDetailPage() {
   const [properties, setProperties] = useState<Property[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [modalError, setModalError] = useState('')
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -240,6 +244,7 @@ export function NoticeDetailPage() {
       propertyId: notice.propertyId ? String(notice.propertyId) : '',
     })
     setError('')
+    setModalError('')
     setEditOpen(true)
   }
 
@@ -247,12 +252,12 @@ export function NoticeDetailPage() {
     event.preventDefault()
     if (!token || !notice) return
     if (!form.title.trim() || !form.message.trim()) {
-      setError('Enter a title and message.')
+      setModalError('Enter a title and message.')
       return
     }
 
     setBusy(true)
-    setError('')
+    setModalError('')
     try {
       const updatedNotice = await api.updateNotice(token, notice.id, {
         title: form.title.trim(),
@@ -261,8 +266,9 @@ export function NoticeDetailPage() {
       })
       setNotice(updatedNotice)
       setEditOpen(false)
+      setModalError('')
     } catch (cause) {
-      setError(errorMessage(cause))
+      setModalError(errorMessage(cause))
     } finally {
       setBusy(false)
     }
@@ -285,7 +291,7 @@ export function NoticeDetailPage() {
 
   return <section className="page-section">
     <PageHeading eyebrow="COMMUNICATIONS" title="Notice details" subtitle={owner ? 'View the complete notice information you shared.' : 'View the complete notice information shared by your property owner.'} action={<button className="button" onClick={() => navigate(noticesPath)}><ArrowLeft size={15} /> Back to notices</button>} />
-    {error && <InlineError>{error}</InlineError>}
+    {!editOpen && error && <InlineError>{error}</InlineError>}
     {loading ? <div className="tenant-notice-detail-card tenant-notice-detail-loading"><LoadingState /></div> : notice ? <article className="tenant-notice-detail-card">
       <header className="tenant-notice-summary">
         <div className="tenant-notice-title-block">
@@ -312,12 +318,12 @@ export function NoticeDetailPage() {
           : notice.propertyId ? 'This notice was shared by your property owner for the selected property.' : 'This notice was shared by your property owner with all your properties.'}</p>
       </section>
     </article> : null}
-    {editOpen && notice && <Modal title="Edit notice" description="Update the notice details for your tenants." onClose={() => setEditOpen(false)}>
+    {editOpen && notice && <Modal title="Edit notice" description="Update the notice details for your tenants." onClose={() => { setEditOpen(false); setModalError('') }} error={modalError}>
       <form className="form-stack" onSubmit={saveNotice} noValidate>
         <Field label="Title" id="notice-detail-title" value={form.title} onChange={(value) => setForm((current) => ({ ...current, title: value }))} required />
         <div className="field-group"><label htmlFor="notice-detail-message">Message <span className="required-mark">*</span></label><textarea id="notice-detail-message" rows={4} value={form.message} onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))} required /></div>
         <div className="field-group"><label htmlFor="notice-detail-property">Property</label><select id="notice-detail-property" value={form.propertyId} onChange={(event) => setForm((current) => ({ ...current, propertyId: event.target.value }))}><option value="">All properties</option>{properties.map((property) => <option key={property.id} value={property.id}>{property.title}</option>)}</select></div>
-        <div className="modal-actions"><button type="button" className="button" onClick={() => setEditOpen(false)}>Cancel</button><button className="button button-primary" disabled={busy}>{busy ? <span className="spinner" /> : null}Save changes</button></div>
+        <div className="modal-actions"><button type="button" className="button" onClick={() => { setEditOpen(false); setModalError('') }}>Cancel</button><button className="button button-primary" disabled={busy}>{busy ? <span className="spinner" /> : null}Save changes</button></div>
       </form>
     </Modal>}
     {deleteOpen && notice && <ConfirmationDialog title={`Delete "${notice.title}"?`} description="This notice will be permanently deleted and will no longer be visible to tenants." confirmLabel="Delete notice" onCancel={() => setDeleteOpen(false)} onConfirm={deleteNotice} />}

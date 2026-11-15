@@ -1,7 +1,9 @@
 package Tenant.Owner.Management.TOM.Controller;
 
+import java.util.Map;
 import jakarta.validation.Valid;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import Tenant.Owner.Management.TOM.DTO.ChangePasswordRequest;
 import Tenant.Owner.Management.TOM.DTO.ProfileUpdateRequest;
 import Tenant.Owner.Management.TOM.DTO.UserResponse;
 import Tenant.Owner.Management.TOM.Security.JwtPrincipal;
@@ -34,5 +37,13 @@ public class ProfileController {
             @Valid @RequestBody ProfileUpdateRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         return userService.updateProfile(JwtPrincipal.userId(jwt), request);
+    }
+
+    @PutMapping("/password")
+    public ResponseEntity<Map<String, String>> changePassword(
+            @Valid @RequestBody ChangePasswordRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        userService.changePassword(JwtPrincipal.userId(jwt), request);
+        return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
     }
 }

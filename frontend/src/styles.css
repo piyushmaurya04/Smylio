@@ -154,7 +154,50 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .alert { padding: 11px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; line-height: 1.5; }
 .alert-error { border-color: color-mix(in srgb, var(--danger) 35%, var(--border)); background: color-mix(in srgb, var(--danger) 8%, var(--surface)); color: var(--danger); }
 .alert-success { border-color: color-mix(in srgb, var(--success) 35%, var(--border)); background: color-mix(in srgb, var(--success) 8%, var(--surface)); color: var(--success); }
+.alert-warning { border-color: color-mix(in srgb, var(--warning) 35%, var(--border)); background: color-mix(in srgb, var(--warning) 8%, var(--surface)); color: var(--warning); }
 .alert-info { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); color: var(--text); }
+.alert-enter { animation: alert-fade-in .25s ease-out; }
+.alert-dissolving { animation: alert-dissolve .7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; pointer-events: none; }
+@keyframes alert-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes alert-dissolve {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 140px;
+  }
+  45% {
+    opacity: 0;
+    transform: translateY(-4px);
+    max-height: 140px;
+    padding-top: 11px;
+    padding-bottom: 11px;
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    border-top-width: 0;
+    border-bottom-width: 0;
+    overflow: hidden;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .alert-enter { animation: none; }
+  .alert-dissolving { animation: alert-dissolve-reduced .3s ease-out forwards; }
+  @keyframes alert-dissolve-reduced {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+}
 .spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -269,6 +312,7 @@ td strong { display: block; font-size: 14px; font-weight: 600; }
 .modal-header h2 { margin: 0; font-family: Manrope, sans-serif; font-size: 19px; font-weight: 700; }
 .modal-header p { margin: 5px 0 0; color: var(--muted); font-size: 12.7px; }
 .modal-content { padding: 19px 20px 20px; }
+.modal-content > .alert { margin-bottom: 16px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 3px; }
 .modal-confirmation-backdrop { align-items: start; padding-top: clamp(18px, 8vh, 76px); }
 .modal-confirmation { animation: confirmation-drop .24s cubic-bezier(.2, .8, .2, 1); }
@@ -289,6 +333,7 @@ td strong { display: block; font-size: 14px; font-weight: 600; }
 .owner-tenant-maintenance-count { width: fit-content; color: var(--text); font-family: Manrope, sans-serif; font-size: 28.6px; font-weight: 700; line-height: 1.2; }
 .owner-tenant-maintenance-count:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 4px; }
 .inline-icon { margin-right: 6px; vertical-align: -2px; color: var(--muted); }
+.profile-heading-actions { display: flex; align-items: center; gap: 10px; }
 .profile-form { max-width: 560px; }
 .profile-details-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
 .profile-details-grid > div { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
@@ -430,6 +475,8 @@ td strong { display: block; font-size: 14px; font-weight: 600; }
 .notice-table-filters select { min-width: 155px; min-height: 38px; padding: 0 11px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-raised); color: var(--text); font-size: 14px; }
 .notice-table { min-width: 550px; }
 .notice-table th { padding: 0 13px 11px; }
+.sortable-header { cursor: pointer; user-select: none; transition: color 0.15s ease; }
+.sortable-header:hover { color: var(--accent); }
 .notice-table td { padding-block: 14px; }
 .notice-table td:last-child, .notice-table th:last-child { width: 68px; text-align: center; }
 .notice-table tbody tr:hover { background: color-mix(in srgb, var(--surface-soft) 55%, transparent); }

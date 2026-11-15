@@ -17,6 +17,8 @@ public class RateLimitService {
     private static final int TENANT_SEARCH_PER_MINUTE = 20;
     private static final int LOGIN_PER_IP_PER_MINUTE = 20;
     private static final int LOGIN_PER_EMAIL_PER_MINUTE = 10;
+    private static final int REGISTER_PER_IP_PER_MINUTE = 30;
+    private static final int REGISTER_PER_EMAIL_PER_MINUTE = 5;
 
     private final Map<String, Bucket> buckets = Collections.synchronizedMap(
             new LinkedHashMap<>(256, 0.75f, true) {
@@ -50,6 +52,25 @@ public class RateLimitService {
                     ignored -> newBucket(LOGIN_PER_EMAIL_PER_MINUTE, Duration.ofMinutes(1)));
             if (!emailBucket.tryConsume(1)) {
                 throw new RateLimitExceededException("Too many login attempts for this email. Please wait and try again.");
+            }
+        }
+    }
+
+    public void consumeRegisterAttempt(String clientIp, String normalizedEmail) {
+        String ipKey = "register-ip:" + (clientIp == null || clientIp.isBlank() ? "unknown" : clientIp);
+        Bucket ipBucket = buckets.computeIfAbsent(
+                ipKey,
+                ignored -> newBucket(REGISTER_PER_IP_PER_MINUTE, Duration.ofMinutes(1)));
+        if (!ipBucket.tryConsume(1)) {
+            throw new RateLimitExceededException("Too many registration attempts from this address. Please wait and try again.");
+        }
+
+        if (normalizedEmail != null && !normalizedEmail.isBlank()) {
+            Bucket emailBucket = buckets.computeIfAbsent(
+                    "register-email:" + normalizedEmail,
+                    ignored -> newBucket(REGISTER_PER_EMAIL_PER_MINUTE, Duration.ofMinutes(1)));
+            if (!emailBucket.tryConsume(1)) {
+                throw new RateLimitExceededException("Too many registration attempts for this email. Please wait and try again.");
             }
         }
     }
