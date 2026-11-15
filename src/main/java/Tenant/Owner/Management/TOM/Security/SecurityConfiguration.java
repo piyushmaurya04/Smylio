@@ -76,13 +76,13 @@ public class SecurityConfiguration {
                                 "/", "/index.html", "/assets/**", "/favicon.ico",
                                 "/brand/**",
                                 "/login", "/register", "/profile", "/faq", "/help",
-                                "/owner/**", "/tenant/**", "/actuator/health")
+                                "/owner/**", "/tenant/**", "/actuator/health", "/error")
                         .permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout")
                         .permitAll()
                         .requestMatchers("/api/auth/**").denyAll()
-                        .requestMatchers("/api/profile/**").hasAnyRole("OWNER", "TENANT")
+                        .requestMatchers("/api/profile", "/api/profile/**").hasAnyRole("OWNER", "TENANT")
                         .requestMatchers("/api/properties/**").hasRole("OWNER")
                         .requestMatchers("/api/leases/**").hasRole("OWNER")
                         .requestMatchers("/api/tenants/**").hasRole("OWNER")

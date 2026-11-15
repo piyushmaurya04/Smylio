@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { CalendarDays, Eye, EyeOff, IdCard, LockKeyhole, Mail, Pencil, Phone, UserRound, Users } from 'lucide-react'
+import axios from 'axios'
+import { CalendarDays, Eye, EyeOff, IdCard, KeyRound, LockKeyhole, Mail, Pencil, Phone, UserRound, Users } from 'lucide-react'
 import { api, errorMessage } from './api'
 import { useAuth } from './auth-context'
 import type { Role } from './types'
-import { Field, InlineError, InlineSuccess, LoadingState, PageHeading, Panel } from './components'
+import { Field, InlineError, InlineSuccess, LoadingState, Modal, PageHeading, Panel } from './components'
 import { formatDate } from './format'
 import type { User } from './types'
 import { OwnerDashboardPage, OwnerLeasesPage, OwnerPropertiesPage, OwnerRentPage, OwnerTenantDetailPage } from './owner-pages'
@@ -110,6 +111,13 @@ export function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false)
+  const [passwordModalError, setPasswordModalError] = useState('')
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [showCurrent, setShowCurrent] = useState(false)
+  const [showNew, setShowNew] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [passwordSaving, setPasswordSaving] = useState(false)
 
   const load = useCallback(async () => {
     if (!token) return
@@ -165,9 +173,95 @@ export function ProfilePage() {
     }
   }
 
+  async function handlePasswordChange(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!token) return
+    if (!passwordForm.currentPassword) {
+      setPasswordModalError('Enter your current password.')
+      return
+    }
+    if (!passwordForm.newPassword) {
+      setPasswordModalError('Enter a new password.')
+      return
+    }
+    if (passwordForm.newPassword.length < 8) {
+      setPasswordModalError('New password must be at least 8 characters.')
+      return
+    }
+    if (new TextEncoder().encode(passwordForm.newPassword).length > 72) {
+      setPasswordModalError('New password must be 72 UTF-8 bytes or fewer.')
+      return
+    }
+    if (passwordForm.newPassword === passwordForm.currentPassword) {
+      setPasswordModalError('New password cannot be the same as your current password.')
+      return
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordModalError('New password and confirm password do not match.')
+      return
+    }
+
+    setPasswordSaving(true)
+    setPasswordModalError('')
+    try {
+      await api.changePassword(token, {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      })
+      setPasswordModalOpen(false)
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      setShowCurrent(false)
+      setShowNew(false)
+      setShowConfirm(false)
+      setMessage('Password changed successfully.')
+    } catch (cause) {
+      if (axios.isAxiosError(cause)) {
+        const serverMessage = (cause.response?.data as { message?: string; error?: string } | undefined)?.message
+          || (cause.response?.data as { message?: string; error?: string } | undefined)?.error
+        if (serverMessage) {
+          setPasswordModalError(serverMessage)
+        } else if (cause.response?.status === 403 || cause.response?.status === 401 || cause.response?.status === 400) {
+          setPasswordModalError('Current password is incorrect.')
+        } else {
+          setPasswordModalError(errorMessage(cause))
+        }
+      } else {
+        setPasswordModalError(errorMessage(cause))
+      }
+    } finally {
+      setPasswordSaving(false)
+    }
+  }
+
   return <section className="page-section">
-    <PageHeading eyebrow="ACCOUNT" title="Your profile" subtitle="View and update your personal contact details." action={profile && !editing ? <button className="button button-primary" onClick={startEditing}><Pencil size={14} /> Edit profile</button> : undefined} />
-    {error && <InlineError>{error}</InlineError>}
+    <PageHeading
+      eyebrow="ACCOUNT"
+      title="Your profile"
+      subtitle="View and update your personal contact details."
+      action={profile && !editing ? (
+        <div className="profile-heading-actions">
+          <button
+            className="button"
+            type="button"
+            onClick={() => {
+              setError('')
+              setPasswordModalError('')
+              setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+              setShowCurrent(false)
+              setShowNew(false)
+              setShowConfirm(false)
+              setPasswordModalOpen(true)
+            }}
+          >
+            <KeyRound size={14} /> Change password
+          </button>
+          <button className="button button-primary" type="button" onClick={startEditing}>
+            <Pencil size={14} /> Edit profile
+          </button>
+        </div>
+      ) : undefined}
+    />
+    {!passwordModalOpen && error && <InlineError>{error}</InlineError>}
     {message && <InlineSuccess onDismiss={() => setMessage('')}>{message}</InlineSuccess>}
     {loading ? <LoadingState label="Loading your profile…" /> : profile ? <Panel title="Profile information" description={profile.role === 'TENANT' ? 'Your tenant ID and account creation date are read-only.' : 'Your account creation date is read-only.'}>
       {editing ? <form className="form-stack profile-form" onSubmit={save} noValidate>
@@ -190,6 +284,36 @@ export function ProfilePage() {
         </div>
       </div>}
     </Panel> : null}
+    {passwordModalOpen && <Modal title="Change password" description="Verify your current password and choose a new one." onClose={() => { setPasswordModalOpen(false); setPasswordModalError('') }} error={passwordModalError}>
+      <form className="form-stack" onSubmit={handlePasswordChange} noValidate>
+        <div className="field-group">
+          <label htmlFor="current-password">Current password <span className="required-mark">*</span></label>
+          <div className="password-wrap">
+            <input id="current-password" type={showCurrent ? 'text' : 'password'} value={passwordForm.currentPassword} onChange={(e) => setPasswordForm((c) => ({ ...c, currentPassword: e.target.value }))} required autoComplete="current-password" placeholder="Enter current password" />
+            <button type="button" className="field-icon-button" onClick={() => setShowCurrent((c) => !c)} aria-label={showCurrent ? 'Hide current password' : 'Show current password'}>{showCurrent ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+          </div>
+        </div>
+        <div className="field-group">
+          <label htmlFor="new-password">New password <span className="required-mark">*</span></label>
+          <div className="password-wrap">
+            <input id="new-password" type={showNew ? 'text' : 'password'} value={passwordForm.newPassword} onChange={(e) => setPasswordForm((c) => ({ ...c, newPassword: e.target.value }))} required autoComplete="new-password" placeholder="At least 8 characters" />
+            <button type="button" className="field-icon-button" onClick={() => setShowNew((c) => !c)} aria-label={showNew ? 'Hide new password' : 'Show new password'}>{showNew ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+          </div>
+          <span className="field-help">Must be at least 8 characters and up to 72 UTF-8 bytes.</span>
+        </div>
+        <div className="field-group">
+          <label htmlFor="confirm-password">Confirm new password <span className="required-mark">*</span></label>
+          <div className="password-wrap">
+            <input id="confirm-password" type={showConfirm ? 'text' : 'password'} value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm((c) => ({ ...c, confirmPassword: e.target.value }))} required autoComplete="new-password" placeholder="Re-enter new password" />
+            <button type="button" className="field-icon-button" onClick={() => setShowConfirm((c) => !c)} aria-label={showConfirm ? 'Hide confirm password' : 'Show confirm password'}>{showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+          </div>
+        </div>
+        <div className="modal-actions">
+          <button type="button" className="button" onClick={() => { setPasswordModalOpen(false); setPasswordModalError('') }}>Cancel</button>
+          <button type="submit" className="button button-primary" disabled={passwordSaving}>{passwordSaving ? <><span className="spinner" /> Updating…</> : 'Update password'}</button>
+        </div>
+      </form>
+    </Modal>}
   </section>
 }
 

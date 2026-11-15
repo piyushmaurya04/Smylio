@@ -9,6 +9,7 @@ import java.util.NoSuchElementException;
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import Tenant.Owner.Management.TOM.DTO.ChangePasswordRequest;
 import Tenant.Owner.Management.TOM.DTO.RegisterRequest;
 import Tenant.Owner.Management.TOM.DTO.ProfileUpdateRequest;
 import Tenant.Owner.Management.TOM.DTO.UserResponse;
@@ -118,6 +119,33 @@ public class UserService {
         user.setEmail(email);
         user.setPhone(request.getPhone().trim());
         return toResponse(userRepository.save(user));
+    }
+
+    @Transactional
+    public void changePassword(Long userId, ChangePasswordRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Password change details are required");
+        }
+        requireText(request.getCurrentPassword(), "current password");
+        requireText(request.getNewPassword(), "new password");
+
+        if (request.getNewPassword().length() < 8) {
+            throw new IllegalArgumentException("New password must be at least 8 characters");
+        }
+        if (request.getNewPassword().getBytes(StandardCharsets.UTF_8).length > 72) {
+            throw new IllegalArgumentException("New password must be 72 UTF-8 bytes or fewer");
+        }
+
+        User user = requireUser(userId);
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("Current password is incorrect");
+        }
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("New password cannot be the same as your current password");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
     }
 
     private User requireUser(Long userId) {

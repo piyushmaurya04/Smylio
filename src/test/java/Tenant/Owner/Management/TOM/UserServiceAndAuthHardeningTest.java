@@ -26,6 +26,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import Tenant.Owner.Management.TOM.Constants.UserRole;
+import Tenant.Owner.Management.TOM.DTO.ChangePasswordRequest;
 import Tenant.Owner.Management.TOM.DTO.LoginRequest;
 import Tenant.Owner.Management.TOM.DTO.RegisterRequest;
 import Tenant.Owner.Management.TOM.Entity.User;
@@ -136,6 +137,62 @@ class UserServiceAndAuthHardeningTest {
         }
         assertThrows(RateLimitExceededException.class,
                 () -> rateLimitService.consumeRegisterAttempt("10.0.0.99", "target@example.com"));
+    }
+
+    @Test
+    void changePasswordSuccessfullyUpdatesPassword() {
+        User user = new User();
+        user.setId(10L);
+        user.setPassword("old-encoded-pass");
+
+        when(userRepository.findById(10L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("CurrentPass123", "old-encoded-pass")).thenReturn(true);
+        when(passwordEncoder.matches("NewPass12345", "old-encoded-pass")).thenReturn(false);
+        when(passwordEncoder.encode("NewPass12345")).thenReturn("new-encoded-pass");
+
+        userService.changePassword(10L, new ChangePasswordRequest("CurrentPass123", "NewPass12345"));
+
+        assertEquals("new-encoded-pass", user.getPassword());
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void changePasswordRejectsIncorrectCurrentPassword() {
+        User user = new User();
+        user.setId(10L);
+        user.setPassword("old-encoded-pass");
+
+        when(userRepository.findById(10L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("WrongPass123", "old-encoded-pass")).thenReturn(false);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> userService.changePassword(10L, new ChangePasswordRequest("WrongPass123", "NewPass12345")));
+
+        assertEquals("Current password is incorrect", ex.getMessage());
+    }
+
+    @Test
+    void changePasswordRejectsSameNewPassword() {
+        User user = new User();
+        user.setId(10L);
+        user.setPassword("old-encoded-pass");
+
+        when(userRepository.findById(10L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("CurrentPass123", "old-encoded-pass")).thenReturn(true);
+        when(passwordEncoder.matches("CurrentPass123", "old-encoded-pass")).thenReturn(true);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> userService.changePassword(10L, new ChangePasswordRequest("CurrentPass123", "CurrentPass123")));
+
+        assertEquals("New password cannot be the same as your current password", ex.getMessage());
+    }
+
+    @Test
+    void changePasswordRejectsShortPassword() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> userService.changePassword(10L, new ChangePasswordRequest("CurrentPass123", "short")));
+
+        assertEquals("New password must be at least 8 characters", ex.getMessage());
     }
 }
 
