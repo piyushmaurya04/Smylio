@@ -13,6 +13,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -95,6 +96,24 @@ public class RefreshTokenService {
         String hash = sha256Hex(rawRefreshToken);
         refreshTokenRepository.findByTokenHash(hash)
                 .ifPresent(token -> refreshTokenRepository.revokeFamily(token.getFamilyId(), LocalDateTime.now(clock)));
+    }
+
+    @Transactional
+    public void revokeAllForUser(Long userId) {
+        if (userId != null) {
+            refreshTokenRepository.revokeAllByUserId(userId, LocalDateTime.now(clock));
+        }
+    }
+
+    @Scheduled(cron = "0 0 3 * * *", zone = "Asia/Kolkata")
+    @Transactional
+    public int purgeStaleTokens() {
+        LocalDateTime cutoff = LocalDateTime.now(clock).minusDays(expirationDays);
+        int deleted = refreshTokenRepository.deleteStaleTokens(cutoff);
+        if (deleted > 0) {
+            logger.info("Purged {} expired or revoked refresh tokens older than {}", deleted, cutoff);
+        }
+        return deleted;
     }
 
     public long getExpirationDays() {

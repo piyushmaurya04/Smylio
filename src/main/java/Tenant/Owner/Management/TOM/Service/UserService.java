@@ -14,6 +14,7 @@ import Tenant.Owner.Management.TOM.DTO.RegisterRequest;
 import Tenant.Owner.Management.TOM.DTO.ProfileUpdateRequest;
 import Tenant.Owner.Management.TOM.DTO.UserResponse;
 import Tenant.Owner.Management.TOM.Entity.User;
+import Tenant.Owner.Management.TOM.Repository.RefreshTokenRepository;
 import Tenant.Owner.Management.TOM.Repository.UserRepository;
 import org.springframework.transaction.annotation.Transactional;
 import Tenant.Owner.Management.TOM.Constants.UserRole;
@@ -26,11 +27,14 @@ public class UserService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, Clock clock) {
+    public UserService(UserRepository userRepository, RefreshTokenRepository refreshTokenRepository,
+            PasswordEncoder passwordEncoder, Clock clock) {
         this.userRepository = userRepository;
+        this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.clock = clock;
     }
@@ -57,7 +61,7 @@ public class UserService {
 
         String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
         if (emailExist(email)) {
-            throw new IllegalStateException("Email already taken: " + email + " Please try again with different Email");
+            throw new IllegalStateException("An account with this email address already exists. Please log in or use a different email.");
         }
 
         User user = new User();
@@ -146,6 +150,7 @@ public class UserService {
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+        refreshTokenRepository.revokeAllByUserId(userId, LocalDateTime.now(clock));
     }
 
     private User requireUser(Long userId) {

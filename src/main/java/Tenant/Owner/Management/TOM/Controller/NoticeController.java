@@ -27,15 +27,18 @@ import Tenant.Owner.Management.TOM.DTO.NoticeCreateRequest;
 import Tenant.Owner.Management.TOM.DTO.NoticeResponse;
 import Tenant.Owner.Management.TOM.Service.NoticeService;
 import Tenant.Owner.Management.TOM.Security.JwtPrincipal;
+import Tenant.Owner.Management.TOM.Security.RateLimitService;
 
 @RestController
 @RequestMapping("/api/notices")
 public class NoticeController {
     private static final int MAX_PAGE_SIZE = 5;
     private final NoticeService noticeService;
+    private final RateLimitService rateLimitService;
 
-    public NoticeController(NoticeService noticeService) {
+    public NoticeController(NoticeService noticeService, RateLimitService rateLimitService) {
         this.noticeService = noticeService;
+        this.rateLimitService = rateLimitService;
     }
 
     @PostMapping
@@ -43,6 +46,7 @@ public class NoticeController {
             @Valid @RequestBody NoticeCreateRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         Long ownerId = JwtPrincipal.userId(jwt);
+        rateLimitService.consumeNoticeCreation(ownerId);
         return ResponseEntity.status(HttpStatus.CREATED).body(noticeService.create(request, ownerId));
     }
 

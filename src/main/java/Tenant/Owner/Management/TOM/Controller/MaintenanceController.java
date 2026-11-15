@@ -34,6 +34,7 @@ import Tenant.Owner.Management.TOM.DTO.MaintenanceResponse;
 import Tenant.Owner.Management.TOM.DTO.MaintenanceStatusUpdate;
 import Tenant.Owner.Management.TOM.Service.MaintenanceService;
 import Tenant.Owner.Management.TOM.Security.JwtPrincipal;
+import Tenant.Owner.Management.TOM.Security.RateLimitService;
 
 @RestController
 @RequestMapping("/api/maintenance")
@@ -41,9 +42,11 @@ public class MaintenanceController {
     private static final Logger logger = LoggerFactory.getLogger(MaintenanceController.class);
     private static final int MAX_PAGE_SIZE = 5;
     private final MaintenanceService maintenanceService;
+    private final RateLimitService rateLimitService;
 
-    public MaintenanceController(MaintenanceService maintenanceService) {
+    public MaintenanceController(MaintenanceService maintenanceService, RateLimitService rateLimitService) {
         this.maintenanceService = maintenanceService;
+        this.rateLimitService = rateLimitService;
     }
 
     @GetMapping("/page")
@@ -103,6 +106,7 @@ public class MaintenanceController {
             @Valid @RequestBody MaintenanceRequestCreate request,
             @AuthenticationPrincipal Jwt jwt) {
         Long tenantId = JwtPrincipal.userId(jwt);
+        rateLimitService.consumeMaintenanceRequest(tenantId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(maintenanceService.raiseRequest(request, tenantId));
     }
@@ -147,6 +151,10 @@ public class MaintenanceController {
             @AuthenticationPrincipal Jwt jwt) {
         Long ownerId = JwtPrincipal.ownerIdOrNull(jwt);
         Long tenantId = JwtPrincipal.tenantIdOrNull(jwt);
+        Long authorId = ownerId != null ? ownerId : tenantId;
+        if (authorId != null) {
+            rateLimitService.consumeCommentCreation(authorId);
+        }
         CommentResponse response = maintenanceService.addComment(id, request.getComment(), ownerId, tenantId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

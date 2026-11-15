@@ -98,13 +98,17 @@ public class AuthOriginValidatorFilter extends OncePerRequestFilter {
             return true;
         }
 
-        // Validate against request's same-origin (Host header or server name + port)
+        // Validate against request's same-origin only when Host header is consistent with the server name
+        String serverName = request.getServerName();
         String hostHeader = request.getHeader("Host");
-        if (hostHeader != null && !hostHeader.isBlank()) {
-            String scheme = request.getScheme();
-            String hostOrigin = normalizeOrigin(scheme + "://" + hostHeader);
-            if (hostOrigin.equalsIgnoreCase(normalizedOrigin)) {
-                return true;
+        if (hostHeader != null && !hostHeader.isBlank() && serverName != null && !serverName.isBlank()) {
+            String hostNameOnly = hostHeader.contains(":") ? hostHeader.substring(0, hostHeader.indexOf(":")) : hostHeader;
+            if (hostNameOnly.equalsIgnoreCase(serverName.trim())) {
+                String scheme = request.getScheme();
+                String hostOrigin = normalizeOrigin(scheme + "://" + hostHeader);
+                if (hostOrigin.equalsIgnoreCase(normalizedOrigin)) {
+                    return true;
+                }
             }
         }
 
