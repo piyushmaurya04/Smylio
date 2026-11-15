@@ -106,7 +106,7 @@ export function NoticesPage() {
 
   return <section className="page-section">
     <PageHeading eyebrow="COMMUNICATIONS" title="Notices" subtitle={owner ? 'Share property updates with tenants.' : 'Updates from your property owner.'} action={owner ? <button className="button button-primary" onClick={() => { setError(''); setModalError(''); setNoticeToEdit(null); setForm({ title: '', message: '', propertyId: '' }); setOpen(true) }}><Plus size={15} /> Post notice</button> : <button className="button" onClick={() => void load()}><RefreshCw size={14} /> Refresh</button>} />
-    {!open && error && <InlineError>{error}</InlineError>}{success && <InlineSuccess>{success}</InlineSuccess>}
+    {!open && error && <InlineError>{error}</InlineError>}{success && <InlineSuccess onDismiss={() => setSuccess('')}>{success}</InlineSuccess>}
     <Panel
       title={owner ? 'Your notices' : 'Notices for your home'}
       description={`${totalNotices} notices`}

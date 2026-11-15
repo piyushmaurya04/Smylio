@@ -168,7 +168,7 @@ export function ProfilePage() {
   return <section className="page-section">
     <PageHeading eyebrow="ACCOUNT" title="Your profile" subtitle="View and update your personal contact details." action={profile && !editing ? <button className="button button-primary" onClick={startEditing}><Pencil size={14} /> Edit profile</button> : undefined} />
     {error && <InlineError>{error}</InlineError>}
-    {message && <InlineSuccess>{message}</InlineSuccess>}
+    {message && <InlineSuccess onDismiss={() => setMessage('')}>{message}</InlineSuccess>}
     {loading ? <LoadingState label="Loading your profile…" /> : profile ? <Panel title="Profile information" description={profile.role === 'TENANT' ? 'Your tenant ID and account creation date are read-only.' : 'Your account creation date is read-only.'}>
       {editing ? <form className="form-stack profile-form" onSubmit={save} noValidate>
         <Field label="Full name" id="profile-name" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} required autoComplete="name" />

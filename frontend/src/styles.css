@@ -154,7 +154,50 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .alert { padding: 11px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; line-height: 1.5; }
 .alert-error { border-color: color-mix(in srgb, var(--danger) 35%, var(--border)); background: color-mix(in srgb, var(--danger) 8%, var(--surface)); color: var(--danger); }
 .alert-success { border-color: color-mix(in srgb, var(--success) 35%, var(--border)); background: color-mix(in srgb, var(--success) 8%, var(--surface)); color: var(--success); }
+.alert-warning { border-color: color-mix(in srgb, var(--warning) 35%, var(--border)); background: color-mix(in srgb, var(--warning) 8%, var(--surface)); color: var(--warning); }
 .alert-info { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); color: var(--text); }
+.alert-enter { animation: alert-fade-in .25s ease-out; }
+.alert-dissolving { animation: alert-dissolve .7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; pointer-events: none; }
+@keyframes alert-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes alert-dissolve {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 140px;
+  }
+  45% {
+    opacity: 0;
+    transform: translateY(-4px);
+    max-height: 140px;
+    padding-top: 11px;
+    padding-bottom: 11px;
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    border-top-width: 0;
+    border-bottom-width: 0;
+    overflow: hidden;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .alert-enter { animation: none; }
+  .alert-dissolving { animation: alert-dissolve-reduced .3s ease-out forwards; }
+  @keyframes alert-dissolve-reduced {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+}
 .spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 

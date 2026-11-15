@@ -187,7 +187,7 @@ export function MaintenancePage() {
 
   return <section className="page-section">
     <PageHeading eyebrow="PROPERTY CARE" title="Maintenance" subtitle={owner ? 'Track and resolve tenant-reported property issues.' : 'Report an issue and follow its progress.'} action={!owner && leases.length > 0 ? <button className="button button-primary" onClick={() => { setError(''); setModalError(''); setCreateOpen(true) }}><Plus size={15} /> New request</button> : undefined} />
-    {!createOpen && !editingRequest && error && <InlineError>{error}</InlineError>}{notice && <InlineSuccess>{notice}</InlineSuccess>}
+    {!createOpen && !editingRequest && error && <InlineError>{error}</InlineError>}{notice && <InlineSuccess onDismiss={() => setNotice('')}>{notice}</InlineSuccess>}
     <Panel title={owner ? 'Requests across your properties' : 'My requests'} description={`${total} requests`} action={<div className="notice-table-filters">
       <label className="notice-search-field" htmlFor="maintenance-search"><Search size={16} /><input id="maintenance-search" type="search" placeholder="Search requests..." value={search} onChange={(event) => { setSearch(event.target.value); setPage(0) }} /></label>
       <select aria-label="Filter requests by property" value={propertyFilter} onChange={(event) => { setPropertyFilter(event.target.value); setPage(0) }}>
@@ -400,7 +400,7 @@ export function MaintenanceDetailPage() {
   return <section className="page-section">
     {loading ? <Panel title="Maintenance request"><LoadingState /></Panel> : error && !request ? <><InlineError>{error}</InlineError><Link className="button" to={`/${owner ? 'owner' : 'tenant'}/maintenance`}>Back to maintenance</Link></> : request ? <>
       <PageHeading eyebrow="PROPERTY CARE" title="Maintenance request" subtitle={`Request #${request.id} · ${request.status.replace('_', ' ')}`} action={!owner ? <div className="notice-table-actions">{request.status === 'OPEN' && <button className="button notice-delete-button" onClick={() => setCancelOpen(true)}><Ban size={14} /> Cancel request</button>}<button className="button" disabled={request.status === 'RESOLVED' || request.status === 'CANCELLED'} title={request.status === 'RESOLVED' || request.status === 'CANCELLED' ? 'Closed requests cannot be edited' : 'Edit request'} onClick={() => { setError(''); setModalError(''); setEditOpen(true) }}><Pencil size={14} /> Edit</button></div> : undefined} />
-      {!editOpen && error && <InlineError>{error}</InlineError>}{success && <InlineSuccess>{success}</InlineSuccess>}
+      {!editOpen && error && <InlineError>{error}</InlineError>}{success && <InlineSuccess onDismiss={() => setSuccess('')}>{success}</InlineSuccess>}
       {!owner && request.status === 'OPEN' && <div className="alert alert-info maintenance-cancel-hint" role="note">You can cancel this request only while its status is Open.</div>}
       <Panel title={request.title} description={`${request.propertyTitle} · Reported by ${owner ? request.tenantName : 'You'}`}>
         <div className="maintenance-detail-meta">

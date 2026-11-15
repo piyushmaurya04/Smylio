@@ -53,7 +53,7 @@ export function OwnerDashboardPage() {
 
   return <section className="page-section">
     <PageHeading eyebrow="OWNER WORKSPACE" title="Overview" subtitle="A current view of your properties, rent and maintenance." action={<button className="button" onClick={() => void load()}><RefreshCw size={14} /> Refresh</button>} />
-    {error && <InlineError>{error}</InlineError>}{message && <InlineSuccess>{message}</InlineSuccess>}
+    {error && <InlineError>{error}</InlineError>}{message && <InlineSuccess onDismiss={() => setMessage('')}>{message}</InlineSuccess>}
     {loading || !summary ? <LoadingState /> : <>
       <div className="stats-grid">
         <StatCard label="Active tenants" value={String(summary.tenantCount)} detail="Across active leases" />
@@ -139,7 +139,7 @@ export function OwnerPropertiesPage() {
 
   return <section className="page-section">
     <PageHeading eyebrow="PORTFOLIO" title="Properties" subtitle="Manage rental details and amenities for your portfolio." action={<button className="button button-primary" onClick={() => { setError(''); setModal('new') }}><Plus size={15} /> Add property</button>} />
-    {!modal && error && <InlineError>{error}</InlineError>}{notice && <InlineSuccess>{notice}</InlineSuccess>}
+    {!modal && error && <InlineError>{error}</InlineError>}{notice && <InlineSuccess onDismiss={() => setNotice('')}>{notice}</InlineSuccess>}
     <Panel title="Your properties" description={`${properties.length} properties`}>
       {loading ? <LoadingState /> : properties.length === 0 ? <EmptyState title="No properties yet" detail="Add your first property to start managing leases and rent." action={<button className="button button-primary" onClick={() => setModal('new')}><Plus size={14} /> Add property</button>} /> : <DataTable headings={['Property', 'Type', 'Rent / month', 'Amenities', 'Status', '']}>
         {properties.map((property) => <tr key={property.id}><td><strong>{property.title}</strong><small className="table-secondary">{property.address}</small></td><td>{property.type}</td><td>{formatCurrency(property.rentAmount)}</td><td><span className="amenity-summary">{property.amenities?.length ? property.amenities.join(', ') : '—'}</span></td><td><StatusBadge status={property.status} /></td><td className="table-actions"><button className="button button-small" onClick={() => { setError(''); setModal(property) }}>Edit</button><button className="icon-action" aria-label={`Delete ${property.title}`} disabled={deleting === property.id} title="Delete property" onClick={() => setPropertyToDelete(property)}><Trash2 size={15} /></button></td></tr>)}
@@ -197,7 +197,7 @@ export function OwnerLeasesPage() {
 
   return <section className="page-section">
     <PageHeading eyebrow="OCCUPANCY" title="Tenants & leases" subtitle="Find a registered tenant by code and assign them to one of your properties." action={<button className="button button-primary" onClick={() => { setError(''); setModalError(''); setOpen(true) }}><Plus size={15} /> Assign tenant</button>} />
-    {!open && error && <InlineError>{error}</InlineError>}{notice && <InlineSuccess>{notice}</InlineSuccess>}
+    {!open && error && <InlineError>{error}</InlineError>}{notice && <InlineSuccess onDismiss={() => setNotice('')}>{notice}</InlineSuccess>}
     <Panel title="Lease register" description={`${leases.length} leases, including history`}>
       {loading ? <LoadingState /> : leases.length === 0 ? <EmptyState title="No leases yet" detail="Assign a registered tenant to one of your properties." /> : <DataTable headings={['Tenant', 'Property', 'Start date', 'Monthly rent', 'Lease', 'Action']}>
         {leases.map((lease) => <tr key={lease.id}><td><Link className="tenant-lease-link" to={`/owner/leases/tenants/${lease.tenantId}?propertyId=${lease.propertyId}`}><strong>{lease.tenantName}</strong><small className="table-secondary">{lease.tenantCode}</small></Link></td><td><strong>{lease.propertyTitle}</strong>{lease.amenities?.length > 0 && <small className="table-secondary">{lease.amenities.join(' · ')}</small>}</td><td>{formatDate(lease.startDate)}</td><td>{formatCurrency(lease.monthlyRent)}</td><td><StatusBadge status={lease.status} /></td><td><span className="notice-table-actions"><Link className="notice-table-action notice-table-open" to={`/owner/leases/tenants/${lease.tenantId}?propertyId=${lease.propertyId}`} aria-label={`View ${lease.tenantName} details for ${lease.propertyTitle}`} title="View tenant details"><Eye size={16} /></Link>{lease.status === 'ACTIVE' && <button className="button button-small button-danger" disabled={busy} onClick={() => setLeaseToEnd(lease)}>End lease</button>}</span></td></tr>)}
@@ -332,7 +332,7 @@ export function OwnerRentPage() {
 
   return <section className="page-section">
     <PageHeading eyebrow="RENT OPERATIONS" title="Rent" subtitle="Review cash claims, generate rent and inspect lease payment history." action={<button className="button button-primary" disabled={busy} onClick={() => void generate()}>{busy ? <span className="spinner" /> : <RefreshCw size={14} />} Generate rent</button>} />
-    {error && <InlineError>{error}</InlineError>}{message && <InlineSuccess>{message}</InlineSuccess>}
+    {error && <InlineError>{error}</InlineError>}{message && <InlineSuccess onDismiss={() => setMessage('')}>{message}</InlineSuccess>}
     <Panel title="Cash payment approvals" description={`${approvals.length} awaiting review`}>
       {loading ? <LoadingState /> : approvals.length === 0 ? <EmptyState title="No approvals pending" detail="Tenant cash claims will appear here." /> : <DataTable headings={['Month', 'Lease', 'Amount', 'Due date', 'Actions']}>
         {approvals.map((rent) => <tr key={rent.id}><td>{rent.forMonth}</td><td>#{rent.leaseId}</td><td>{formatCurrency(Number(rent.amount) + Number(rent.fine))}</td><td>{formatDate(rent.dueDate)}</td><td className="table-actions"><button className="button button-small button-primary" disabled={busy} onClick={() => setRentToApprove(rent)}>Accept</button><button className="button button-small button-danger" disabled={busy} onClick={() => setRentToReject(rent)}>Reject</button></td></tr>)}

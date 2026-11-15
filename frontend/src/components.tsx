@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { errorMessage } from './api'
 import { isNoticeUnread, NOTICE_READ_EVENT, timeUntilNoticeExpires } from './notice-status'
@@ -26,12 +26,88 @@ export function LoadingState({ label = 'Loading your workspace…' }: { label?: 
   return <div className="loading-state"><span className="spinner" />{label}</div>
 }
 
-export function InlineError({ children }: { children: ReactNode }) {
-  return <div className="alert alert-error" role="alert">{children}</div>
+export function AutoDismissAlert({
+  children,
+  className = '',
+  role = 'status',
+  autoDismiss = true,
+  duration = 10000,
+  onDismiss,
+}: {
+  children: ReactNode
+  className?: string
+  role?: string
+  autoDismiss?: boolean
+  duration?: number
+  onDismiss?: () => void
+}) {
+  const [phase, setPhase] = useState<'visible' | 'dissolving' | 'hidden'>('visible')
+  const onDismissRef = useRef(onDismiss)
+
+  useEffect(() => {
+    onDismissRef.current = onDismiss
+  }, [onDismiss])
+
+  useEffect(() => {
+    setPhase('visible')
+    if (!autoDismiss) return
+
+    let dissolveTimeout: number | undefined
+    const timer = window.setTimeout(() => {
+      setPhase('dissolving')
+      dissolveTimeout = window.setTimeout(() => {
+        setPhase('hidden')
+        onDismissRef.current?.()
+      }, 700)
+    }, duration)
+
+    return () => {
+      window.clearTimeout(timer)
+      if (dissolveTimeout) window.clearTimeout(dissolveTimeout)
+    }
+  }, [children, autoDismiss, duration])
+
+  if (phase === 'hidden') return null
+
+  const animationClass = phase === 'dissolving' ? 'alert-dissolving' : 'alert-enter'
+
+  return <div className={`alert ${className} ${animationClass}`.trim()} role={role}>{children}</div>
 }
 
-export function InlineSuccess({ children }: { children: ReactNode }) {
-  return <div className="alert alert-success" role="status">{children}</div>
+export function InlineError({ children, autoDismiss = false, duration = 10000, onDismiss }: {
+  children: ReactNode
+  autoDismiss?: boolean
+  duration?: number
+  onDismiss?: () => void
+}) {
+  return <AutoDismissAlert className="alert-error" role="alert" autoDismiss={autoDismiss} duration={duration} onDismiss={onDismiss}>{children}</AutoDismissAlert>
+}
+
+export function InlineSuccess({ children, autoDismiss = true, duration = 10000, onDismiss }: {
+  children: ReactNode
+  autoDismiss?: boolean
+  duration?: number
+  onDismiss?: () => void
+}) {
+  return <AutoDismissAlert className="alert-success" role="status" autoDismiss={autoDismiss} duration={duration} onDismiss={onDismiss}>{children}</AutoDismissAlert>
+}
+
+export function InlineWarning({ children, autoDismiss = true, duration = 10000, onDismiss }: {
+  children: ReactNode
+  autoDismiss?: boolean
+  duration?: number
+  onDismiss?: () => void
+}) {
+  return <AutoDismissAlert className="alert-warning" role="alert" autoDismiss={autoDismiss} duration={duration} onDismiss={onDismiss}>{children}</AutoDismissAlert>
+}
+
+export function InlineNotice({ children, autoDismiss = true, duration = 10000, onDismiss }: {
+  children: ReactNode
+  autoDismiss?: boolean
+  duration?: number
+  onDismiss?: () => void
+}) {
+  return <AutoDismissAlert className="alert-info" role="status" autoDismiss={autoDismiss} duration={duration} onDismiss={onDismiss}>{children}</AutoDismissAlert>
 }
 
 export function StatusBadge({ status }: { status: string }) {
