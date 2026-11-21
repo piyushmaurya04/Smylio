@@ -19,12 +19,20 @@ public class RateLimitService {
     private static final int LOGIN_PER_EMAIL_PER_MINUTE = 10;
     private static final int REGISTER_PER_IP_PER_MINUTE = 30;
     private static final int REGISTER_PER_EMAIL_PER_MINUTE = 5;
+    private static final int PASSWORD_CHANGE_PER_WINDOW = 5;
+    private static final int COMMENT_CREATION_PER_MINUTE = 30;
+    private static final int MAINTENANCE_REQUEST_PER_WINDOW = 15;
+    private static final int NOTICE_CREATION_PER_WINDOW = 20;
 
     private final Map<String, Bucket> buckets = Collections.synchronizedMap(
             new LinkedHashMap<>(256, 0.75f, true) {
                 @Override
                 protected boolean removeEldestEntry(Map.Entry<String, Bucket> eldest) {
-                    return size() > MAX_TRACKED_KEYS;
+                    if (size() <= MAX_TRACKED_KEYS) {
+                        return false;
+                    }
+                    // Prevent attackers from flushing out active penalty buckets with dummy keys
+                    return eldest.getValue().getAvailableTokens() > 0 || size() > MAX_TRACKED_KEYS * 2;
                 }
             });
 
@@ -72,6 +80,42 @@ public class RateLimitService {
             if (!emailBucket.tryConsume(1)) {
                 throw new RateLimitExceededException("Too many registration attempts for this email. Please wait and try again.");
             }
+        }
+    }
+
+    public void consumePasswordChange(Long userId) {
+        Bucket bucket = buckets.computeIfAbsent(
+                "password-change:" + userId,
+                ignored -> newBucket(PASSWORD_CHANGE_PER_WINDOW, Duration.ofMinutes(15)));
+        if (!bucket.tryConsume(1)) {
+            throw new RateLimitExceededException("Too many password change attempts. Please wait 15 minutes and try again.");
+        }
+    }
+
+    public void consumeCommentCreation(Long userId) {
+        Bucket bucket = buckets.computeIfAbsent(
+                "comment-create:" + userId,
+                ignored -> newBucket(COMMENT_CREATION_PER_MINUTE, Duration.ofMinutes(1)));
+        if (!bucket.tryConsume(1)) {
+            throw new RateLimitExceededException("Too many comments submitted. Please wait a minute and try again.");
+        }
+    }
+
+    public void consumeMaintenanceRequest(Long tenantId) {
+        Bucket bucket = buckets.computeIfAbsent(
+                "maintenance-create:" + tenantId,
+                ignored -> newBucket(MAINTENANCE_REQUEST_PER_WINDOW, Duration.ofMinutes(10)));
+        if (!bucket.tryConsume(1)) {
+            throw new RateLimitExceededException("Too many maintenance requests raised. Please wait a few minutes and try again.");
+        }
+    }
+
+    public void consumeNoticeCreation(Long ownerId) {
+        Bucket bucket = buckets.computeIfAbsent(
+                "notice-create:" + ownerId,
+                ignored -> newBucket(NOTICE_CREATION_PER_WINDOW, Duration.ofMinutes(10)));
+        if (!bucket.tryConsume(1)) {
+            throw new RateLimitExceededException("Too many notices published. Please wait a few minutes and try again.");
         }
     }
 

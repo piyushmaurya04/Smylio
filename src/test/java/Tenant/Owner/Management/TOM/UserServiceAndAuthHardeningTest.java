@@ -6,12 +6,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -31,6 +33,7 @@ import Tenant.Owner.Management.TOM.DTO.LoginRequest;
 import Tenant.Owner.Management.TOM.DTO.RegisterRequest;
 import Tenant.Owner.Management.TOM.Entity.User;
 import Tenant.Owner.Management.TOM.Exceptions.RateLimitExceededException;
+import Tenant.Owner.Management.TOM.Repository.RefreshTokenRepository;
 import Tenant.Owner.Management.TOM.Repository.UserRepository;
 import Tenant.Owner.Management.TOM.Security.JwtTokenService;
 import Tenant.Owner.Management.TOM.Security.RateLimitService;
@@ -43,6 +46,8 @@ class UserServiceAndAuthHardeningTest {
 
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private RefreshTokenRepository refreshTokenRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
@@ -154,6 +159,7 @@ class UserServiceAndAuthHardeningTest {
 
         assertEquals("new-encoded-pass", user.getPassword());
         verify(userRepository).save(user);
+        verify(refreshTokenRepository).revokeAllByUserId(eq(10L), any(LocalDateTime.class));
     }
 
     @Test

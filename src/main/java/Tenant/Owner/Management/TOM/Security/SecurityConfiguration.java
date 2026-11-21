@@ -68,6 +68,20 @@ public class SecurityConfiguration {
         } else {
             http.cors(AbstractHttpConfigurer::disable);
         }
+        http.headers(headers -> {
+            headers.contentSecurityPolicy(csp -> csp.policyDirectives(
+                    "default-src 'self'; " +
+                    "script-src 'self'; " +
+                    "style-src 'self' 'unsafe-inline'; " +
+                    "img-src 'self' data: https:; " +
+                    "font-src 'self' data:; " +
+                    "connect-src 'self'; " +
+                    "frame-ancestors 'none'; " +
+                    "base-uri 'self'; " +
+                    "form-action 'self'"));
+            headers.permissionsPolicy(pp -> pp.policy("camera=(), microphone=(), geolocation=(), payment=()"));
+            headers.frameOptions(frame -> frame.deny());
+        });
         http.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exceptions -> exceptions
                         .accessDeniedHandler(accessDeniedHandler()))

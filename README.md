@@ -31,9 +31,13 @@ Designed as a production-hardened Spring Boot + React monolith packaged into a s
   - `15m` (`900s`) HS256 Bearer JWT stored **in React memory only** (never `localStorage`).
   - `256`-bit opaque refresh tokens stored as SHA-256 hex hashes in `refresh_tokens`, delivered via an `HttpOnly; SameSite=Strict; Path=/api/auth` cookie.
   - Single-use token rotation on `POST /api/auth/refresh` with **reuse detection** (replaying an old token revokes the entire `family_id`), `POST /api/auth/logout` revocation, and single-flight Axios `401` retry.
+  - Password change immediately revokes all active refresh tokens for the user across all devices, while issuing a fresh replacement cookie for the active session.
+  - Automated daily 03:00 IST scheduled task (`RefreshTokenService.purgeStaleTokens`) purges revoked and expired refresh tokens older than 14 days.
 - **Constant-Time Auth & Abuse Protection:**
   - BCrypt (cost 12) password hashing with no plaintext fallback and a dummy BCrypt verification when an email does not exist to mitigate timing-based account enumeration.
-  - Bucket4j in-memory rate limiting on `POST /api/auth/login` (per IP & email) and `GET /api/tenants/search` (per owner), plus `@Valid` Bean Validation on all request DTOs.
+  - Eviction-safe Bucket4j rate limiting: protects active penalty buckets from cache eviction, covering `POST /api/auth/login`, `POST /api/auth/register`, `GET /api/tenants/search`, `PUT /api/profile/password`, `POST /api/maintenance`, `POST /api/maintenance/*/comments`, and `POST /api/notices`.
+  - Registration conflict sanitization returning generic messages to mitigate user account enumeration.
+  - Tomcat `RemoteIpValve` with RFC1918 internal proxy filtering and configurable `TRUSTED_PROXIES` for accurate real client IP rate limiting behind reverse proxies (Render, Cloudflare, ALB).
   - Tenant registration generates random `TNT-` + 8 Crockford Base32 codes (`SecureRandom`), and tenant search exposes only `name`, `maskedPhone`, and `tenantCode`.
 - **Concurrency-Safe Leases & Rent Payments:**
   - Lease creation acquires a `PESSIMISTIC_WRITE` lock on the parent `Property` row (`SELECT ... FOR UPDATE`) to serialize concurrent lease assignments.
@@ -44,6 +48,8 @@ Designed as a production-hardened Spring Boot + React monolith packaged into a s
   - All monetary values use `BigDecimal` / `DECIMAL(10, 2)`.
 - **Zero-Trust Data Isolation & Observability:**
   - Dual-layer security: Spring Security route/role matchers (`ROLE_OWNER` / `ROLE_TENANT`) + row-level ownership scoping in JPA repositories (`ownerId` / `tenantId` extracted exclusively from the verified JWT subject).
+  - Defense-in-depth headers: `Content-Security-Policy` (CSP), `Permissions-Policy`, and `X-Frame-Options: DENY`.
+  - CSRF defense: `AuthOriginValidatorFilter` on cookie endpoints verifying that `Host` strictly matches `request.getServerName()`.
   - Domain enums (`@Enumerated(EnumType.STRING)`), `CorrelationIdFilter` (`X-Request-Id` in response headers and SLF4J MDC logs), centralized `GlobalExceptionHandler`, and CORS disabled in production (`dev` profile only).
 
 ---
@@ -98,7 +104,7 @@ Designed as a production-hardened Spring Boot + React monolith packaged into a s
 | Route Group | Purpose |
 |---|---|
 | `/api/auth/**` | Registration, rate-limited login, cookie-based token refresh (`POST /refresh`), and logout revocation (`POST /logout`) |
-| `/api/profile` | View and edit authenticated user's contact profile |
+| `/api/profile` | View/edit profile, rate-limited password change with full-session refresh token revocation |
 | `/api/properties/**` | Owner property & amenity CRUD |
 | `/api/tenants/**` | Rate-limited masked tenant search (`?code=...`) and owner-scoped tenant history |
 | `/api/leases/**` | Lease creation, active-lease term updates, and termination with prorated final billing |

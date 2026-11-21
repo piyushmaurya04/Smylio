@@ -126,6 +126,23 @@ class RefreshTokenServiceTest {
         verify(refreshTokenRepository, never()).save(any());
     }
 
+    @Test
+    void revokeAllForUserRevokesActiveTokensForTargetUser() {
+        refreshTokenService.revokeAllForUser(42L);
+        verify(refreshTokenRepository).revokeAllByUserId(42L, LocalDateTime.now(FIXED_CLOCK));
+    }
+
+    @Test
+    void purgeStaleTokensCallsRepositoryWithCutoffDate() {
+        LocalDateTime expectedCutoff = LocalDateTime.now(FIXED_CLOCK).minusDays(14);
+        when(refreshTokenRepository.deleteStaleTokens(expectedCutoff)).thenReturn(5);
+
+        int deleted = refreshTokenService.purgeStaleTokens();
+
+        assertEquals(5, deleted);
+        verify(refreshTokenRepository).deleteStaleTokens(expectedCutoff);
+    }
+
     private User user(Long id) {
         User user = new User();
         user.setId(id);
