@@ -1,7 +1,9 @@
 package Tenant.Owner.Management.TOM;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -60,5 +62,34 @@ class TenantServiceTest {
 
         assertThrows(java.util.NoSuchElementException.class,
                 () -> tenantService.findByTenantCode("TNT-1"));
+    }
+
+    @Test
+    void rejectsSelfSearchWhenCallerUserIdMatchesTenant() {
+        User self = new User();
+        self.setId(5L);
+        self.setName("Self User");
+        self.setRole(UserRole.TENANT);
+        self.setTenantCode("TNT-SELF");
+        when(userRepository.findByTenantCode("TNT-SELF")).thenReturn(Optional.of(self));
+
+        var ex = assertThrows(IllegalArgumentException.class,
+                () -> tenantService.findByTenantCode("TNT-SELF", 5L));
+        assertTrue(ex.getMessage().contains("This is your own Tenant Code"));
+    }
+
+    @Test
+    void allowsSearchWhenCallerUserIdDiffersFromTenant() {
+        User other = new User();
+        other.setId(10L);
+        other.setName("Other User");
+        other.setRole(UserRole.TENANT);
+        other.setPhone("9876543210");
+        other.setTenantCode("TNT-OTHER");
+        when(userRepository.findByTenantCode("TNT-OTHER")).thenReturn(Optional.of(other));
+
+        var res = tenantService.findByTenantCode("TNT-OTHER", 5L);
+        assertNotNull(res);
+        assertEquals("Other User", res.getName());
     }
 }

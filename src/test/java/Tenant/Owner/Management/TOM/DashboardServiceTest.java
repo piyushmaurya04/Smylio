@@ -24,6 +24,7 @@ import Tenant.Owner.Management.TOM.Constants.UserRole;
 import Tenant.Owner.Management.TOM.Entity.User;
 import Tenant.Owner.Management.TOM.Repository.LeaseRepository;
 import Tenant.Owner.Management.TOM.Repository.MaintenanceRequestRepository;
+import Tenant.Owner.Management.TOM.Repository.NoticeRepository;
 import Tenant.Owner.Management.TOM.Repository.RentPaymentRepository;
 import Tenant.Owner.Management.TOM.Repository.UserRepository;
 import Tenant.Owner.Management.TOM.Service.DashboardService;
@@ -38,6 +39,8 @@ class DashboardServiceTest {
     private RentPaymentRepository rentPaymentRepository;
     @Mock
     private MaintenanceRequestRepository maintenanceRequestRepository;
+    @Mock
+    private NoticeRepository noticeRepository;
 
     @InjectMocks
     private DashboardService dashboardService;
@@ -80,6 +83,26 @@ class DashboardServiceTest {
 
         assertThrows(ResponseStatusException.class, () -> dashboardService.getOwnerDashboard(7L));
         verify(leaseRepository, never()).countDistinctTenantsByOwnerIdAndStatus(7L, LeaseStatus.ACTIVE);
+    }
+
+    @Test
+    void getWorkspaceBadgesReturnsCountsForDualRoleUser() {
+        User dualRole = user(4L, UserRole.OWNER);
+        dualRole.addRole(UserRole.TENANT);
+        when(userRepository.findById(4L)).thenReturn(Optional.of(dualRole));
+        when(rentPaymentRepository.countByLease_Property_OwnerIdAndStatus(4L, RentStatus.AWAITING_APPROVAL)).thenReturn(2L);
+        when(maintenanceRequestRepository.countByProperty_OwnerIdAndStatusIn(4L,
+                List.of(MaintenanceStatus.OPEN, MaintenanceStatus.IN_PROGRESS))).thenReturn(3L);
+        when(rentPaymentRepository.countByLease_TenantIdAndStatusIn(4L,
+                List.of(RentStatus.PENDING, RentStatus.LATE, RentStatus.AWAITING_APPROVAL))).thenReturn(1L);
+        when(noticeRepository.findVisibleToTenant(4L, LeaseStatus.ACTIVE)).thenReturn(List.of());
+
+        var badges = dashboardService.getWorkspaceBadges(4L);
+
+        assertEquals(2, badges.getOwnerPendingApprovals());
+        assertEquals(3, badges.getOwnerOpenTickets());
+        assertEquals(1, badges.getTenantPendingRents());
+        assertEquals(0, badges.getTenantUnreadNotices());
     }
 
     private User user(Long id, UserRole role) {

@@ -1,7 +1,24 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { CalendarDays, Eye, EyeOff, IdCard, KeyRound, LockKeyhole, Mail, Pencil, Phone, UserRound, Users } from 'lucide-react'
+import {
+  Building2,
+  CalendarDays,
+  Check,
+  Copy,
+  Eye,
+  EyeOff,
+  Home,
+  IdCard,
+  KeyRound,
+  LockKeyhole,
+  Mail,
+  Pencil,
+  Phone,
+  Sparkles,
+  UserRound,
+  Users,
+} from 'lucide-react'
 import { api, errorMessage } from './api'
 import { useAuth } from './auth-context'
 import type { Role } from './types'
@@ -63,7 +80,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   return (
     <div className="auth-screen">
       <div className="auth-visual">
-        <div className="auth-visual-top"><img className="auth-brand-logo theme-logo-dark" src="/brand/smylio-logo.png" alt="" /><img className="auth-brand-logo theme-logo-light" src="/brand/smylio-logo-light.png" alt="" /><span>Smylio <small>RENTING MADE HAPPIER</small></span></div>
+        <Link to="/" className="auth-visual-top"><img className="auth-brand-logo theme-logo-dark" src="/brand/smylio-logo.png" alt="" /><img className="auth-brand-logo theme-logo-light" src="/brand/smylio-logo-light.png" alt="" /><span>Smylio <small>RENTING MADE HAPPIER</small></span></Link>
         <div className="auth-visual-content">
           <p className="eyebrow">TENANT & OWNER MANAGEMENT</p>
           <h1>Every property,<br /><em>in good order.</em></h1>
@@ -71,7 +88,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         </div>
       </div>
       <div className="auth-panel-wrap">
-        <div className="auth-mobile-brand"><img className="auth-brand-logo theme-logo-dark" src="/brand/smylio-logo.png" alt="" /><img className="auth-brand-logo theme-logo-light" src="/brand/smylio-logo-light.png" alt="" /><span>Smylio</span></div>
+        <Link to="/" className="auth-mobile-brand"><img className="auth-brand-logo theme-logo-dark" src="/brand/smylio-logo.png" alt="" /><img className="auth-brand-logo theme-logo-light" src="/brand/smylio-logo-light.png" alt="" /><span>Smylio</span></Link>
         <section className="auth-panel">
           <div className="auth-heading"><div className="auth-icon"><LockKeyhole size={18} /></div><p className="eyebrow">{registering ? `CREATE ACCOUNT · STEP ${registrationStep} OF 2` : 'WELCOME BACK'}</p><h2>{registering ? 'Create your account' : 'Sign in to Smylio'}</h2><p>{registering ? registrationStep === 1 ? "Let's start with your full name." : 'Complete your account details.' : 'Use your account credentials to continue.'}</p></div>
           {error && <InlineError>{error}</InlineError>}
@@ -104,6 +121,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
 export function ProfilePage() {
   const { token, updateUser } = useAuth()
+  const navigate = useNavigate()
   const [profile, setProfile] = useState<User | null>(null)
   const [form, setForm] = useState({ name: '', email: '', phone: '' })
   const [loading, setLoading] = useState(true)
@@ -118,6 +136,7 @@ export function ProfilePage() {
   const [showNew, setShowNew] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [passwordSaving, setPasswordSaving] = useState(false)
+  const [copiedTenantCode, setCopiedTenantCode] = useState(false)
 
   const load = useCallback(async () => {
     if (!token) return
@@ -136,6 +155,16 @@ export function ProfilePage() {
   }, [token, updateUser])
 
   useEffect(() => { void load() }, [load])
+
+  async function copyTenantCode(code: string) {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopiedTenantCode(true)
+      setTimeout(() => setCopiedTenantCode(false), 2000)
+    } catch {
+      // non-blocking
+    }
+  }
 
   function startEditing() {
     if (!profile) return
@@ -263,27 +292,114 @@ export function ProfilePage() {
     />
     {!passwordModalOpen && error && <InlineError>{error}</InlineError>}
     {message && <InlineSuccess onDismiss={() => setMessage('')}>{message}</InlineSuccess>}
-    {loading ? <LoadingState label="Loading your profile…" /> : profile ? <Panel title="Profile information" description={profile.role === 'TENANT' ? 'Your tenant ID and account creation date are read-only.' : 'Your account creation date is read-only.'}>
-      {editing ? <form className="form-stack profile-form" onSubmit={save} noValidate>
-        <Field label="Full name" id="profile-name" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} required autoComplete="name" />
-        <Field label="Email address" id="profile-email" type="email" value={form.email} onChange={(value) => setForm((current) => ({ ...current, email: value }))} required autoComplete="email" />
-        <Field label="Phone number" id="profile-phone" type="tel" value={form.phone} onChange={(value) => setForm((current) => ({ ...current, phone: value }))} required autoComplete="tel" />
-        <div className="modal-actions"><button className="button" type="button" disabled={saving} onClick={() => { setEditing(false); setError('') }}>Cancel</button><button className="button button-primary" type="submit" disabled={saving}>{saving ? <><span className="spinner" /> Saving…</> : 'Save changes'}</button></div>
-      </form> : <div className="account-profile-layout">
-        <div className="account-profile-identity">
-          <span className="account-profile-avatar">{profile.name.slice(0, 1).toUpperCase()}</span>
-          <div><strong>{profile.name}</strong><span>{profile.role === 'OWNER' ? 'Owner' : 'Tenant'}</span></div>
+    {loading ? <LoadingState label="Loading your profile…" /> : profile ? <>
+      <Panel title="Profile information" description="Your contact information and primary account details.">
+        {editing ? <form className="form-stack profile-form" onSubmit={save} noValidate>
+          <Field label="Full name" id="profile-name" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} required autoComplete="name" />
+          <Field label="Email address" id="profile-email" type="email" value={form.email} onChange={(value) => setForm((current) => ({ ...current, email: value }))} required autoComplete="email" />
+          <Field label="Phone number" id="profile-phone" type="tel" value={form.phone} onChange={(value) => setForm((current) => ({ ...current, phone: value }))} required autoComplete="tel" />
+          <div className="modal-actions"><button className="button" type="button" disabled={saving} onClick={() => { setEditing(false); setError('') }}>Cancel</button><button className="button button-primary" type="submit" disabled={saving}>{saving ? <><span className="spinner" /> Saving…</> : 'Save changes'}</button></div>
+        </form> : <div className="account-profile-layout">
+          <div className="account-profile-identity">
+            <span className="account-profile-avatar">{profile.name.slice(0, 1).toUpperCase()}</span>
+            <div><strong>{profile.name}</strong><span>{profile.role === 'OWNER' ? 'Owner' : 'Tenant'}</span></div>
+          </div>
+          <div className="account-profile-details">
+            <div className="account-profile-detail"><span className="account-profile-detail-icon"><UserRound size={21} /></span><div><span>Name</span><strong>{profile.name}</strong></div></div>
+            <div className="account-profile-detail"><span className="account-profile-detail-icon"><Mail size={21} /></span><div><span>Email</span><a href={`mailto:${profile.email}`}>{profile.email}</a></div></div>
+            <div className="account-profile-detail"><span className="account-profile-detail-icon"><Phone size={21} /></span><div><span>Phone</span>{profile.phone ? <a href={`tel:${profile.phone}`}>{profile.phone}</a> : <strong>Not provided</strong>}</div></div>
+            <div className="account-profile-detail"><span className="account-profile-detail-icon"><Users size={21} /></span><div><span>Active workspace</span><strong>{profile.role === 'OWNER' ? 'Owner workspace' : 'Tenant portal'}</strong></div></div>
+            {profile.tenantCode && (
+              <div className="account-profile-detail">
+                <span className="account-profile-detail-icon"><IdCard size={21} /></span>
+                <div>
+                  <span>Tenant ID</span>
+                  <div className="profile-tenant-id-row">
+                    <strong>{profile.tenantCode}</strong>
+                    <button
+                      type="button"
+                      className="button button-subtle profile-copy-button"
+                      onClick={() => void copyTenantCode(profile.tenantCode!)}
+                    >
+                      {copiedTenantCode ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy ID</>}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="account-profile-detail"><span className="account-profile-detail-icon"><CalendarDays size={21} /></span><div><span>Created at</span><strong>{formatDate(profile.createdAt)}</strong></div></div>
+          </div>
+        </div>}
+      </Panel>
+
+      <Panel
+        title="Account Workspaces"
+        description="Smylio allows you to seamlessly manage properties as an Owner and rent as a Tenant with a single login."
+        className="profile-workspaces-panel"
+      >
+        <div className="profile-workspaces-grid">
+          {/* Owner Workspace Card */}
+          <div className={`profile-workspace-card ${(profile.roles ?? [profile.role]).includes('OWNER') ? 'workspace-card-enabled' : ''} ${profile.role === 'OWNER' ? 'workspace-card-active' : ''}`}>
+            <div className="workspace-card-header">
+              <div className="workspace-card-title">
+                <div className="workspace-card-icon"><Building2 size={18} /></div>
+                <div>
+                  <strong>Owner Workspace</strong>
+                  <small>Properties, leases & rent collection</small>
+                </div>
+              </div>
+              <span className={`status-badge ${(profile.roles ?? [profile.role]).includes('OWNER') ? 'status-active' : 'status-inactive'}`}>
+                {profile.role === 'OWNER' ? 'Active now' : (profile.roles ?? [profile.role]).includes('OWNER') ? 'Enabled' : 'Not activated'}
+              </span>
+            </div>
+            <p className="workspace-card-desc">
+              List rental properties, invite tenants, track incoming rent payments, and coordinate property repairs.
+            </p>
+            {!(profile.roles ?? [profile.role]).includes('OWNER') && (
+              <div className="workspace-card-footer">
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={() => navigate('/workspace/activate/owner')}
+                >
+                  <Sparkles size={14} /> Activate Owner Workspace
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Tenant Portal Card */}
+          <div className={`profile-workspace-card ${(profile.roles ?? [profile.role]).includes('TENANT') ? 'workspace-card-enabled' : ''} ${profile.role === 'TENANT' ? 'workspace-card-active' : ''}`}>
+            <div className="workspace-card-header">
+              <div className="workspace-card-title">
+                <div className="workspace-card-icon"><Home size={18} /></div>
+                <div>
+                  <strong>Tenant Portal</strong>
+                  <small>My home, rent receipts & repair tickets</small>
+                </div>
+              </div>
+              <span className={`status-badge ${(profile.roles ?? [profile.role]).includes('TENANT') ? 'status-active' : 'status-inactive'}`}>
+                {profile.role === 'TENANT' ? 'Active now' : (profile.roles ?? [profile.role]).includes('TENANT') ? 'Enabled' : 'Not activated'}
+              </span>
+            </div>
+            <p className="workspace-card-desc">
+              Connect to your landlord using your Tenant ID, record rent receipts, and submit maintenance tickets.
+            </p>
+            {!(profile.roles ?? [profile.role]).includes('TENANT') && (
+              <div className="workspace-card-footer">
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={() => navigate('/workspace/activate/tenant')}
+                >
+                  <Sparkles size={14} /> Activate Tenant Portal
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-        <div className="account-profile-details">
-          <div className="account-profile-detail"><span className="account-profile-detail-icon"><UserRound size={21} /></span><div><span>Name</span><strong>{profile.name}</strong></div></div>
-          <div className="account-profile-detail"><span className="account-profile-detail-icon"><Mail size={21} /></span><div><span>Email</span><a href={`mailto:${profile.email}`}>{profile.email}</a></div></div>
-          <div className="account-profile-detail"><span className="account-profile-detail-icon"><Phone size={21} /></span><div><span>Phone</span>{profile.phone ? <a href={`tel:${profile.phone}`}>{profile.phone}</a> : <strong>Not provided</strong>}</div></div>
-          <div className="account-profile-detail"><span className="account-profile-detail-icon"><Users size={21} /></span><div><span>Role</span><strong>{profile.role === 'OWNER' ? 'Owner' : 'Tenant'}</strong></div></div>
-          {profile.role === 'TENANT' && <div className="account-profile-detail"><span className="account-profile-detail-icon"><IdCard size={21} /></span><div><span>Tenant ID</span><strong>{profile.tenantCode}</strong></div></div>}
-          <div className="account-profile-detail"><span className="account-profile-detail-icon"><CalendarDays size={21} /></span><div><span>Created at</span><strong>{formatDate(profile.createdAt)}</strong></div></div>
-        </div>
-      </div>}
-    </Panel> : null}
+      </Panel>
+    </> : null}
     {passwordModalOpen && <Modal title="Change password" description="Verify your current password and choose a new one." onClose={() => { setPasswordModalOpen(false); setPasswordModalError('') }} error={passwordModalError}>
       <form className="form-stack" onSubmit={handlePasswordChange} noValidate>
         <div className="field-group">

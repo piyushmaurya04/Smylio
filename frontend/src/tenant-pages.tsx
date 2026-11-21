@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, ArrowUpRight, Bike, CalendarDays, Camera, Clock3, Copy, CreditCard, Home, LayoutGrid, Mail, MessageCircle, Package, Phone, Receipt, RefreshCw, Send, Snowflake, Sofa, Table2, Tv, Wallet } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Bike, CalendarDays, Camera, Clock3, Copy, CreditCard, Home, LayoutGrid, Mail, MessageCircle, Package, Phone, Receipt, RefreshCw, Send, Snowflake, Sofa, Sparkles, Table2, Tv, Wallet } from 'lucide-react'
 import { api, errorMessage } from './api'
 import { useAuth } from './auth-context'
-import { ConfirmationDialog, DataTable, EmptyState, InlineError, InlineSuccess, LoadingState, NoticeUnreadDot, PageHeading, Panel, StatCard, StatusBadge } from './components'
+import { ConfirmationDialog, DataTable, EmptyState, InlineError, InlineSuccess, InlineWarning, LoadingState, NoticeUnreadDot, PageHeading, Panel, StatCard, StatusBadge } from './components'
 import { formatCurrency, formatDate } from './format'
 import { markNoticeRead } from './notice-status'
 import type { Lease, Notice, Rent, TenantRents } from './types'
@@ -17,6 +17,7 @@ export function TenantDashboardPage() {
   const [error, setError] = useState('')
   const [shareMessage, setShareMessage] = useState('')
   const [shareError, setShareError] = useState('')
+  const [justActivated, setJustActivated] = useState(() => sessionStorage.getItem('tom-just-activated') === 'TENANT')
   const tenantCode = user?.tenantCode
   const tenantIdMessage = tenantCode ? `My Smylio tenant ID is ${tenantCode}.` : ''
 
@@ -53,6 +54,40 @@ export function TenantDashboardPage() {
   return <section className="page-section">
     <PageHeading eyebrow="TENANT PORTAL" title="My home" subtitle="Your lease, rent and property updates in one place." action={<button className="button" onClick={() => void load()}><RefreshCw size={14} /> Refresh</button>} />
     {error && <InlineError>{error}</InlineError>}
+
+    {justActivated && (
+      <div className="welcome-hero-banner welcome-hero-tenant">
+        <div className="welcome-hero-content">
+          <div className="welcome-hero-pill"><Sparkles size={13} /> TENANT PORTAL ACTIVATED</div>
+          <h2>Welcome to your Tenant Portal!</h2>
+          <p>
+            Your account now has full tenant capabilities. Your unique Tenant ID is{' '}
+            <strong className="welcome-hero-code">{tenantCode}</strong>. Share it with your landlord to link your home.
+            Your owner workspace data is completely safe and accessible whenever you switch back.
+          </p>
+        </div>
+        <div className="welcome-hero-actions">
+          <button
+            type="button"
+            className="button button-primary"
+            onClick={() => void copyTenantId()}
+          >
+            <Copy size={14} /> Copy Tenant ID
+          </button>
+          <button
+            type="button"
+            className="button"
+            onClick={() => {
+              sessionStorage.removeItem('tom-just-activated')
+              setJustActivated(false)
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      </div>
+    )}
+
     <Panel className="tenant-id-panel" title="Your Smylio tenant ID" description="Share this ID with your property owner to connect your lease.">
       {tenantCode ? <>
         <div className="tenant-id-row">
@@ -206,6 +241,7 @@ export function TenantRentPage() {
   return <section className="page-section">
     <PageHeading eyebrow="TENANT PORTAL" title="Rent & payments" subtitle="Your outstanding balance and complete payment history." action={<button className="button" onClick={() => void load()}><RefreshCw size={14} /> Refresh</button>} />
     {!paymentConfirmation && error && <InlineError>{error}</InlineError>}{message && <InlineSuccess onDismiss={() => setMessage('')}>{message}</InlineSuccess>}
+    {summary && summary.totalDue > 0 && <InlineWarning autoDismiss={false}>You have an outstanding rent balance of {formatCurrency(summary.totalDue)}. Please complete your payment before the due date to avoid additional late fines.</InlineWarning>}
     {loading || !summary ? <LoadingState /> : <>
       <div className="stats-grid stats-grid-tenant"><StatCard label="Total due" value={formatCurrency(summary.totalDue)} detail="Rent plus accrued fines" tone={summary.totalDue ? 'warning' : 'accent'} /><StatCard label="Next due date" value={formatDate(summary.nextDueDate)} detail="Earliest unpaid item" /><StatCard label="Payment records" value={String(summary.history.length)} detail="Across your leases" /></div>
       <Panel title="Outstanding rent" description="Pay online now or submit a cash claim for owner approval.">

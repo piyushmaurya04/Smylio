@@ -68,9 +68,13 @@ public class LeaseService {
 
         String normalizedCode = request.getTenantCode().trim().toUpperCase(Locale.ROOT);
         User tenant = userRepository.findByTenantCode(normalizedCode)
-                .filter(user -> UserRole.TENANT == user.getRole())
+                .filter(user -> user.hasRole(UserRole.TENANT))
                 .orElseThrow(() -> new java.util.NoSuchElementException(
                         "Tenant not Found, Please check the Tenant Code and try again " + normalizedCode));
+
+        if (tenant.getId().equals(ownerId)) {
+            throw new IllegalArgumentException("An owner cannot create a lease for themselves as the tenant");
+        }
 
         Lease lease = new Lease();
         lease.setProperty(property);
@@ -150,7 +154,7 @@ public class LeaseService {
     public List<LeaseResponse> getMyActiveLeases(Long tenantId) {
         User tenant = userRepository.findById(tenantId)
                 .orElseThrow(() -> new java.util.NoSuchElementException("User not found: " + tenantId));
-        if (UserRole.TENANT != tenant.getRole()) {
+        if (!tenant.hasRole(UserRole.TENANT)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "This action is not allowed for this user role");
         }

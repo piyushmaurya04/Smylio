@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Ban, ChevronLeft, ChevronRight, Eye, P
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { api, errorMessage } from './api'
 import { useAuth } from './auth-context'
-import { ConfirmationDialog, EmptyState, Field, InlineError, InlineSuccess, LoadingState, Modal, PageHeading, Panel, StatusBadge } from './components'
+import { ConfirmationDialog, EmptyState, Field, InlineError, InlineSuccess, InlineWarning, LoadingState, Modal, PageHeading, Panel, StatusBadge } from './components'
 import { formatDate } from './format'
 import type { Lease, MaintenanceComment, MaintenanceRequest, Property } from './types'
 
@@ -401,7 +401,7 @@ export function MaintenanceDetailPage() {
     {loading ? <Panel title="Maintenance request"><LoadingState /></Panel> : error && !request ? <><InlineError>{error}</InlineError><Link className="button" to={`/${owner ? 'owner' : 'tenant'}/maintenance`}>Back to maintenance</Link></> : request ? <>
       <PageHeading eyebrow="PROPERTY CARE" title="Maintenance request" subtitle={`Request #${request.id} · ${request.status.replace('_', ' ')}`} action={!owner ? <div className="notice-table-actions">{request.status === 'OPEN' && <button className="button notice-delete-button" onClick={() => setCancelOpen(true)}><Ban size={14} /> Cancel request</button>}<button className="button" disabled={request.status === 'RESOLVED' || request.status === 'CANCELLED'} title={request.status === 'RESOLVED' || request.status === 'CANCELLED' ? 'Closed requests cannot be edited' : 'Edit request'} onClick={() => { setError(''); setModalError(''); setEditOpen(true) }}><Pencil size={14} /> Edit</button></div> : undefined} />
       {!editOpen && error && <InlineError>{error}</InlineError>}{success && <InlineSuccess onDismiss={() => setSuccess('')}>{success}</InlineSuccess>}
-      {!owner && request.status === 'OPEN' && <div className="alert alert-info maintenance-cancel-hint" role="note">You can cancel this request only while its status is Open.</div>}
+      {!owner && request.status === 'OPEN' && <InlineWarning autoDismiss={false}>You can cancel this request only while its status is Open.</InlineWarning>}
       <Panel title={request.title} description={`${request.propertyTitle} · Reported by ${owner ? request.tenantName : 'You'}`}>
         <div className="maintenance-detail-meta">
           <span><strong>Priority</strong><StatusBadge status={request.priority} /></span>

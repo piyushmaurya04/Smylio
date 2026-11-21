@@ -23,6 +23,8 @@ public class RateLimitService {
     private static final int COMMENT_CREATION_PER_MINUTE = 30;
     private static final int MAINTENANCE_REQUEST_PER_WINDOW = 15;
     private static final int NOTICE_CREATION_PER_WINDOW = 20;
+    private static final int SWITCH_ROLE_PER_MINUTE = 30;
+    private static final int ACTIVATE_ROLE_PER_HOUR = 5;
 
     private final Map<String, Bucket> buckets = Collections.synchronizedMap(
             new LinkedHashMap<>(256, 0.75f, true) {
@@ -116,6 +118,24 @@ public class RateLimitService {
                 ignored -> newBucket(NOTICE_CREATION_PER_WINDOW, Duration.ofMinutes(10)));
         if (!bucket.tryConsume(1)) {
             throw new RateLimitExceededException("Too many notices published. Please wait a few minutes and try again.");
+        }
+    }
+
+    public void consumeSwitchRole(Long userId) {
+        Bucket bucket = buckets.computeIfAbsent(
+                "switch-role:" + userId,
+                ignored -> newBucket(SWITCH_ROLE_PER_MINUTE, Duration.ofMinutes(1)));
+        if (!bucket.tryConsume(1)) {
+            throw new RateLimitExceededException("Too many workspace switch requests. Please wait a minute and try again.");
+        }
+    }
+
+    public void consumeActivateRole(Long userId) {
+        Bucket bucket = buckets.computeIfAbsent(
+                "activate-role:" + userId,
+                ignored -> newBucket(ACTIVATE_ROLE_PER_HOUR, Duration.ofHours(1)));
+        if (!bucket.tryConsume(1)) {
+            throw new RateLimitExceededException("Too many role activation attempts. Please wait an hour and try again.");
         }
     }
 

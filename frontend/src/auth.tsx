@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api, configureAuthBridge } from './api'
 import { AuthContext, type AuthState } from './auth-context'
-import type { AuthResponse, User } from './types'
+import type { AuthResponse, Role, User, WorkspaceBadges } from './types'
 
 const LEGACY_STORAGE_KEY = 'tom-auth-session'
+const WORKSPACE_SYNC_STORAGE_KEY = 'tom-active-workspace-switch'
 
 interface MemorySession {
   token: string
@@ -17,6 +18,7 @@ let bootRefreshPromise: Promise<AuthResponse | null> | null = null
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<MemorySession | null>(null)
+  const [badges, setBadges] = useState<WorkspaceBadges | null>(null)
   const [initializing, setInitializing] = useState(true)
   const sessionRef = useRef<MemorySession | null>(null)
   const refreshTimerRef = useRef<number | null>(null)
@@ -32,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearTimer()
     sessionRef.current = null
     setSession(null)
+    setBadges(null)
   }, [clearTimer])
 
   const applyAuthResponse = useCallback((response: AuthResponse) => {
@@ -56,6 +59,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [applyAuthResponse, clearSession])
 
+  const refreshBadges = useCallback(async () => {
+    const currentToken = sessionRef.current?.token
+    if (!currentToken) {
+      setBadges(null)
+      return
+    }
+    try {
+      const res = await api.workspaceBadges(currentToken)
+      setBadges(res)
+    } catch {
+      // Non-blocking
+    }
+  }, [])
+
+  const switchRole = useCallback(async (role: Role) => {
+    const currentToken = sessionRef.current?.token
+    if (!currentToken) throw new Error('Not authenticated')
+    const response = await api.switchRole(currentToken, role)
+    applyAuthResponse(response)
+    try {
+      localStorage.setItem(WORKSPACE_SYNC_STORAGE_KEY, `${role}:${Date.now()}`)
+    } catch {
+      // Non-blocking storage
+    }
+    try {
+      const res = await api.workspaceBadges(response.accessToken)
+      setBadges(res)
+    } catch {
+      // Non-blocking
+    }
+  }, [applyAuthResponse])
+
+  const activateRole = useCallback(async (role: Role) => {
+    const currentToken = sessionRef.current?.token
+    if (!currentToken) throw new Error('Not authenticated')
+    const response = await api.activateRole(currentToken, role)
+    applyAuthResponse(response)
+    try {
+      localStorage.setItem(WORKSPACE_SYNC_STORAGE_KEY, `${role}:${Date.now()}`)
+    } catch {
+      // Non-blocking storage
+    }
+    try {
+      const res = await api.workspaceBadges(response.accessToken)
+      setBadges(res)
+    } catch {
+      // Non-blocking
+    }
+  }, [applyAuthResponse])
+
   useEffect(() => {
     clearTimer()
     if (!session) return
@@ -65,6 +118,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, msUntilRefresh)
     return clearTimer
   }, [session, silentRefresh, clearTimer])
+
+  useEffect(() => {
+    if (session?.token) {
+      void refreshBadges()
+    } else {
+      setBadges(null)
+    }
+  }, [session?.token, refreshBadges])
+
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === WORKSPACE_SYNC_STORAGE_KEY && event.newValue) {
+        void silentRefresh().then(() => {
+          void refreshBadges()
+        })
+      }
+    }
+    window.addEventListener('storage', handleStorage)
+    return () => window.removeEventListener('storage', handleStorage)
+  }, [silentRefresh, refreshBadges])
 
   useEffect(() => {
     configureAuthBridge({
@@ -121,9 +194,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthState = {
     token: session?.token ?? null,
     user: session?.user ?? null,
+    badges,
     initializing,
     signIn,
     signUp,
+    switchRole,
+    activateRole,
+    refreshBadges,
     updateUser,
     signOut,
   }

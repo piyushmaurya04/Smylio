@@ -35,6 +35,10 @@ public interface RentPaymentRepository extends JpaRepository<RentPayment, Long> 
 
     List<RentPayment> findByLease_Property_OwnerIdAndStatus(Long ownerId, RentStatus status);
 
+    long countByLease_Property_OwnerIdAndStatus(Long ownerId, RentStatus status);
+
+    long countByLease_TenantIdAndStatusIn(Long tenantId, List<RentStatus> statuses);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE RentPayment r SET r.status = :paidStatus, r.method = :method, " +
             "r.transactionId = :transactionId, r.paidDate = :paidDate, r.fine = :fine " +

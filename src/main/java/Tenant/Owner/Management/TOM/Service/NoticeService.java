@@ -150,7 +150,7 @@ public class NoticeService {
     }
 
     private void requireRole(User user, UserRole requiredRole) {
-        if (requiredRole != user.getRole()) {
+        if (!user.hasRole(requiredRole)) {
             logger.warn("Notice access role mismatch: userId={} actualRole={} requiredRole={}",
                     user.getId(), user.getRole(), requiredRole);
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,

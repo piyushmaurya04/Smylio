@@ -9,6 +9,7 @@ import java.util.NoSuchElementException;
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import Tenant.Owner.Management.TOM.DTO.AuthResponse;
 import Tenant.Owner.Management.TOM.DTO.ChangePasswordRequest;
 import Tenant.Owner.Management.TOM.DTO.RegisterRequest;
 import Tenant.Owner.Management.TOM.DTO.ProfileUpdateRequest;
@@ -18,6 +19,7 @@ import Tenant.Owner.Management.TOM.Repository.RefreshTokenRepository;
 import Tenant.Owner.Management.TOM.Repository.UserRepository;
 import org.springframework.transaction.annotation.Transactional;
 import Tenant.Owner.Management.TOM.Constants.UserRole;
+import Tenant.Owner.Management.TOM.Security.JwtTokenService;
 
 @Service
 public class UserService {
@@ -29,13 +31,15 @@ public class UserService {
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtTokenService jwtTokenService;
     private final Clock clock;
 
     public UserService(UserRepository userRepository, RefreshTokenRepository refreshTokenRepository,
-            PasswordEncoder passwordEncoder, Clock clock) {
+            PasswordEncoder passwordEncoder, JwtTokenService jwtTokenService, Clock clock) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtTokenService = jwtTokenService;
         this.clock = clock;
     }
 
@@ -70,6 +74,7 @@ public class UserService {
         user.setPhone(request.getPhone().trim());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(role);
+        user.addRole(role);
         user.setCreatedAt(LocalDateTime.now(clock));
         if (UserRole.TENANT == role) {
             user.setTenantCode(generateUniqueTenantCode());
@@ -153,6 +158,59 @@ public class UserService {
         refreshTokenRepository.revokeAllByUserId(userId, LocalDateTime.now(clock));
     }
 
+    @Transactional
+    public AuthResponse activateRole(Long userId, String roleName) {
+        if (roleName == null || roleName.isBlank()) {
+            throw new IllegalArgumentException("Role must not be blank");
+        }
+        UserRole targetRole;
+        try {
+            targetRole = UserRole.valueOf(roleName.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Invalid role: " + roleName);
+        }
+
+        User user = requireUser(userId);
+        if (UserRole.TENANT == targetRole && user.getTenantCode() == null) {
+            user.setTenantCode(generateUniqueTenantCode());
+        }
+        user.addRole(targetRole);
+        user.setRole(targetRole);
+        User saved = userRepository.save(user);
+        return buildAuthResponse(saved);
+    }
+
+    @Transactional
+    public AuthResponse switchRole(Long userId, String roleName) {
+        if (roleName == null || roleName.isBlank()) {
+            throw new IllegalArgumentException("Role must not be blank");
+        }
+        UserRole targetRole;
+        try {
+            targetRole = UserRole.valueOf(roleName.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Invalid role: " + roleName);
+        }
+
+        User user = requireUser(userId);
+        if (!user.hasRole(targetRole)) {
+            throw new IllegalArgumentException("Role " + targetRole + " is not activated for this account. Please activate it first.");
+        }
+
+        user.setRole(targetRole);
+        User saved = userRepository.save(user);
+        return buildAuthResponse(saved);
+    }
+
+    public AuthResponse buildAuthResponse(User user) {
+        AuthResponse response = new AuthResponse();
+        response.setAccessToken(jwtTokenService.createToken(user));
+        response.setTokenType("Bearer");
+        response.setExpiresIn(jwtTokenService.getExpirationSeconds());
+        response.setUser(toResponse(user));
+        return response;
+    }
+
     private User requireUser(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new NoSuchElementException("User not found: " + userId));
@@ -165,6 +223,10 @@ public class UserService {
         response.setEmail(user.getEmail());
         response.setPhone(user.getPhone());
         response.setRole(user.getRole() != null ? user.getRole().name() : null);
+        java.util.List<String> roleList = user.getRoles() != null && !user.getRoles().isEmpty()
+                ? user.getRoles().stream().map(Enum::name).sorted().toList()
+                : user.getRole() != null ? java.util.List.of(user.getRole().name()) : java.util.List.of();
+        response.setRoles(roleList);
         response.setTenantCode(user.getTenantCode());
         response.setCreatedAt(user.getCreatedAt());
 

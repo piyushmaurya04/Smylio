@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ArrowUpRight, CalendarDays, Check, CircleDollarSign, Eye, Mail, Phone, Plus, RefreshCw, Search, Trash2, Wrench, X } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, CalendarDays, Check, CircleDollarSign, Eye, Mail, Phone, Plus, RefreshCw, Search, Sparkles, Trash2, Wrench, X } from 'lucide-react'
 import { api, errorMessage } from './api'
 import { useAuth } from './auth-context'
 import { ConfirmationDialog, DataTable, EmptyState, Field, InlineError, InlineSuccess, LoadingState, Modal, PageHeading, Panel, StatCard, StatusBadge } from './components'
@@ -17,6 +17,7 @@ export function OwnerDashboardPage() {
   const [message, setMessage] = useState('')
   const [rentToApprove, setRentToApprove] = useState<Rent | null>(null)
   const [rentToReject, setRentToReject] = useState<Rent | null>(null)
+  const [justActivated, setJustActivated] = useState(() => sessionStorage.getItem('tom-just-activated') === 'OWNER')
 
   const load = useCallback(async () => {
     if (!token) return
@@ -54,6 +55,42 @@ export function OwnerDashboardPage() {
   return <section className="page-section">
     <PageHeading eyebrow="OWNER WORKSPACE" title="Overview" subtitle="A current view of your properties, rent and maintenance." action={<button className="button" onClick={() => void load()}><RefreshCw size={14} /> Refresh</button>} />
     {error && <InlineError>{error}</InlineError>}{message && <InlineSuccess onDismiss={() => setMessage('')}>{message}</InlineSuccess>}
+
+    {justActivated && (
+      <div className="welcome-hero-banner welcome-hero-owner">
+        <div className="welcome-hero-content">
+          <div className="welcome-hero-pill"><Sparkles size={13} /> OWNER WORKSPACE ACTIVATED</div>
+          <h2>Welcome to your Owner Workspace!</h2>
+          <p>
+            You can now list rental properties, onboard tenants, and track monthly rental income.
+            Your tenant portal data is completely safe and accessible whenever you switch back.
+          </p>
+        </div>
+        <div className="welcome-hero-actions">
+          <Link
+            to="/owner/properties"
+            className="button button-primary"
+            onClick={() => {
+              sessionStorage.removeItem('tom-just-activated')
+              setJustActivated(false)
+            }}
+          >
+            <Plus size={14} /> Add First Property
+          </Link>
+          <button
+            type="button"
+            className="button"
+            onClick={() => {
+              sessionStorage.removeItem('tom-just-activated')
+              setJustActivated(false)
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      </div>
+    )}
+
     {loading || !summary ? <LoadingState /> : <>
       <div className="stats-grid">
         <StatCard label="Active tenants" value={String(summary.tenantCount)} detail="Across active leases" />

@@ -35,7 +35,7 @@ public class TenantController {
             @RequestParam String code,
             @AuthenticationPrincipal Jwt jwt) {
         rateLimitService.consumeTenantSearch(JwtPrincipal.userId(jwt));
-        return tenantService.findByTenantCode(code);
+        return tenantService.findByTenantCode(code, JwtPrincipal.userId(jwt));
     }
 
     @GetMapping("/{tenantId}")

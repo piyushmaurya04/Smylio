@@ -11,6 +11,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -18,9 +20,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import Tenant.Owner.Management.TOM.DTO.RegisterRequest;
+import Tenant.Owner.Management.TOM.DTO.SwitchRoleRequest;
 import Tenant.Owner.Management.TOM.DTO.AuthResponse;
 import Tenant.Owner.Management.TOM.DTO.LoginRequest;
 import Tenant.Owner.Management.TOM.DTO.UserResponse;
+import Tenant.Owner.Management.TOM.Security.JwtPrincipal;
 import Tenant.Owner.Management.TOM.Security.RateLimitService;
 import Tenant.Owner.Management.TOM.Service.AuthService;
 import Tenant.Owner.Management.TOM.Service.RefreshTokenService;
@@ -91,6 +95,15 @@ public class AuthController {
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, buildRefreshCookie("", Duration.ZERO, httpRequest).toString())
                 .build();
+    }
+
+    @PostMapping("/switch-role")
+    public ResponseEntity<AuthResponse> switchRole(
+            @Valid @RequestBody SwitchRoleRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        Long userId = JwtPrincipal.userId(jwt);
+        rateLimitService.consumeSwitchRole(userId);
+        return ResponseEntity.ok(userService.switchRole(userId, request.getRole()));
     }
 
     private ResponseCookie buildRefreshCookie(String value, Duration maxAge, HttpServletRequest httpRequest) {

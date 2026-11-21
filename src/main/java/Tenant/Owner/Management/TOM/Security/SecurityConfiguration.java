@@ -90,11 +90,12 @@ public class SecurityConfiguration {
                                 "/", "/index.html", "/assets/**", "/favicon.ico",
                                 "/brand/**",
                                 "/login", "/register", "/profile", "/faq", "/help",
-                                "/owner/**", "/tenant/**", "/actuator/health", "/error")
+                                "/owner/**", "/tenant/**", "/workspace/**", "/actuator/health", "/error")
                         .permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout")
                         .permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/switch-role").hasAnyRole("OWNER", "TENANT")
                         .requestMatchers("/api/auth/**").denyAll()
                         .requestMatchers("/api/profile", "/api/profile/**").hasAnyRole("OWNER", "TENANT")
                         .requestMatchers("/api/properties/**").hasRole("OWNER")
@@ -125,6 +126,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.DELETE, "/api/notices/*").hasRole("OWNER")
                         .requestMatchers(HttpMethod.GET, "/api/notices", "/api/notices/page")
                         .hasAnyRole("OWNER", "TENANT")
+                        .requestMatchers(HttpMethod.GET, "/api/dashboard/badges").hasAnyRole("OWNER", "TENANT")
                         .requestMatchers(HttpMethod.GET, "/api/dashboard/owner").hasRole("OWNER")
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(resourceServer -> resourceServer
