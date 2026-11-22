@@ -2,6 +2,7 @@ package Tenant.Owner.Management.TOM.Security;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -29,12 +30,16 @@ public class JwtTokenService {
 
     public String createToken(User user) {
         Instant issuedAt = Instant.now(clock);
+        List<String> roleList = user.getRoles() != null && !user.getRoles().isEmpty()
+                ? user.getRoles().stream().map(Enum::name).sorted().toList()
+                : user.getRole() != null ? List.of(user.getRole().name()) : List.of();
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer("tom-api")
                 .issuedAt(issuedAt)
                 .expiresAt(issuedAt.plusSeconds(expirationSeconds))
                 .subject(user.getId().toString())
                 .claim("role", user.getRole().name())
+                .claim("roles", roleList)
                 .claim("email", user.getEmail())
                 .build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();

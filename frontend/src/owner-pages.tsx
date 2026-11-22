@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ArrowUpRight, CalendarDays, Check, CircleDollarSign, Eye, Mail, Phone, Plus, RefreshCw, Search, Trash2, Wrench, X } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, CalendarDays, Check, CircleDollarSign, Eye, Mail, Phone, Plus, RefreshCw, Search, Sparkles, Trash2, Wrench, X } from 'lucide-react'
 import { api, errorMessage } from './api'
 import { useAuth } from './auth-context'
 import { ConfirmationDialog, DataTable, EmptyState, Field, InlineError, InlineSuccess, LoadingState, Modal, PageHeading, Panel, StatCard, StatusBadge } from './components'
@@ -17,6 +17,7 @@ export function OwnerDashboardPage() {
   const [message, setMessage] = useState('')
   const [rentToApprove, setRentToApprove] = useState<Rent | null>(null)
   const [rentToReject, setRentToReject] = useState<Rent | null>(null)
+  const [justActivated, setJustActivated] = useState(() => sessionStorage.getItem('tom-just-activated') === 'OWNER')
 
   const load = useCallback(async () => {
     if (!token) return
@@ -54,11 +55,47 @@ export function OwnerDashboardPage() {
   return <section className="page-section">
     <PageHeading eyebrow="OWNER WORKSPACE" title="Overview" subtitle="A current view of your properties, rent and maintenance." action={<button className="button" onClick={() => void load()}><RefreshCw size={14} /> Refresh</button>} />
     {error && <InlineError>{error}</InlineError>}{message && <InlineSuccess onDismiss={() => setMessage('')}>{message}</InlineSuccess>}
+
+    {justActivated && (
+      <div className="welcome-hero-banner welcome-hero-owner">
+        <div className="welcome-hero-content">
+          <div className="welcome-hero-pill"><Sparkles size={13} /> OWNER WORKSPACE ACTIVATED</div>
+          <h2>Welcome to your Owner Workspace!</h2>
+          <p>
+            You can now list rental properties, onboard tenants, and track monthly rental income.
+            Your tenant portal data is completely safe and accessible whenever you switch back.
+          </p>
+        </div>
+        <div className="welcome-hero-actions">
+          <Link
+            to="/owner/properties"
+            className="button button-primary"
+            onClick={() => {
+              sessionStorage.removeItem('tom-just-activated')
+              setJustActivated(false)
+            }}
+          >
+            <Plus size={14} /> Add First Property
+          </Link>
+          <button
+            type="button"
+            className="button"
+            onClick={() => {
+              sessionStorage.removeItem('tom-just-activated')
+              setJustActivated(false)
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      </div>
+    )}
+
     {loading || !summary ? <LoadingState /> : <>
       <div className="stats-grid">
-        <StatCard label="Active tenants" value={String(summary.tenantCount)} detail="Across active leases" />
+        <StatCard label="Active tenants" value={String(summary.tenantCount)} detail="Across active leases" to="/owner/leases" />
         <StatCard label="Outstanding rent" value={formatCurrency(summary.pendingRent)} detail="Includes accrued fines" tone="accent" />
-        <StatCard label="Open issues" value={String(summary.openMaintenanceCount)} detail="Open or in progress" tone={summary.openMaintenanceCount ? 'warning' : 'neutral'} />
+        <StatCard label="Open issues" value={String(summary.openMaintenanceCount)} detail="Open or in progress" tone={summary.openMaintenanceCount ? 'warning' : 'neutral'} to="/owner/maintenance" />
       </div>
       <div className="dashboard-grid">
         <Panel className="cash-approval-panel" title="Cash payment approvals" description={`${approvals.length} awaiting your review`} action={<button className="button button-quiet" onClick={() => void generate()} disabled={busy !== null}>{busy === -1 ? <span className="spinner" /> : <RefreshCw size={14} />} Generate rent</button>}>
@@ -335,11 +372,11 @@ export function OwnerRentPage() {
     {error && <InlineError>{error}</InlineError>}{message && <InlineSuccess onDismiss={() => setMessage('')}>{message}</InlineSuccess>}
     <Panel title="Cash payment approvals" description={`${approvals.length} awaiting review`}>
       {loading ? <LoadingState /> : approvals.length === 0 ? <EmptyState title="No approvals pending" detail="Tenant cash claims will appear here." /> : <DataTable headings={['Month', 'Lease', 'Amount', 'Due date', 'Actions']}>
-        {approvals.map((rent) => <tr key={rent.id}><td>{rent.forMonth}</td><td>#{rent.leaseId}</td><td>{formatCurrency(Number(rent.amount) + Number(rent.fine))}</td><td>{formatDate(rent.dueDate)}</td><td className="table-actions"><button className="button button-small button-primary" disabled={busy} onClick={() => setRentToApprove(rent)}>Accept</button><button className="button button-small button-danger" disabled={busy} onClick={() => setRentToReject(rent)}>Reject</button></td></tr>)}
+        {approvals.map((rent) => <tr key={rent.id}><td>{rent.forMonth}</td><td>{rent.leaseId}</td><td>{formatCurrency(Number(rent.amount) + Number(rent.fine))}</td><td>{formatDate(rent.dueDate)}</td><td className="table-actions"><button className="button button-small button-primary" disabled={busy} onClick={() => setRentToApprove(rent)}>Accept</button><button className="button button-small button-danger" disabled={busy} onClick={() => setRentToReject(rent)}>Reject</button></td></tr>)}
       </DataTable>}
     </Panel>
     <Panel title="Payment history" description="Choose a lease to inspect its rent records.">
-      <div className="filter-row"><div className="field-group"><label htmlFor="rent-lease">Lease</label><select id="rent-lease" value={selected} onChange={(event) => void selectLease(event.target.value)}><option value="">Select a lease</option>{leases.map((lease) => <option key={lease.id} value={lease.id}>{lease.propertyTitle} · {lease.tenantName} · #{lease.id}</option>)}</select></div></div>
+      <div className="filter-row"><div className="field-group"><label htmlFor="rent-lease">Lease</label><select id="rent-lease" value={selected} onChange={(event) => void selectLease(event.target.value)}><option value="">Select a lease</option>{leases.map((lease) => <option key={lease.id} value={lease.id}>{lease.propertyTitle} · {lease.tenantName}</option>)}</select></div></div>
       {busy ? <LoadingState /> : selected && history.length ? <DataTable headings={['Month', 'Due date', 'Amount', 'Fine', 'Paid', 'Status']}>
         {history.map((rent) => <tr key={rent.id}><td>{rent.forMonth}</td><td>{formatDate(rent.dueDate)}</td><td>{formatCurrency(rent.amount)}</td><td>{formatCurrency(rent.fine)}</td><td>{formatDate(rent.paidDate)}</td><td><StatusBadge status={rent.status} /></td></tr>)}
       </DataTable> : selected ? <EmptyState title="No rent records" detail="Rent records appear after a billing cycle is generated." /> : null}

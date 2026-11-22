@@ -1,7 +1,24 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { CalendarDays, Eye, EyeOff, IdCard, KeyRound, LockKeyhole, Mail, Pencil, Phone, UserRound, Users } from 'lucide-react'
+import {
+  Building2,
+  CalendarDays,
+  Check,
+  Copy,
+  Eye,
+  EyeOff,
+  Home,
+  IdCard,
+  KeyRound,
+  LockKeyhole,
+  Mail,
+  Pencil,
+  Phone,
+  Sparkles,
+  UserRound,
+  Users,
+} from 'lucide-react'
 import { api, errorMessage } from './api'
 import { useAuth } from './auth-context'
 import type { Role } from './types'
@@ -28,7 +45,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const errors = {
     name: registering && !values.name.trim() ? 'Enter your name.' : '',
     email: !values.email.trim() ? 'Email is required.' : !emailValid ? 'Enter a valid email address.' : '',
-    password: !values.password ? 'Password is required.' : registering && values.password.length < 8 ? 'Use at least 8 characters.' : registering && passwordBytes > 72 ? 'Password must be 72 UTF-8 bytes or fewer.' : '',
+    password: !values.password ? 'Password is required.' : registering && values.password.length < 8 ? 'Use at least 8 characters.' : registering && passwordBytes > 72 ? 'Password must be 72 characters or fewer.' : '',
     phone: registering && !values.phone.trim() ? 'Phone number is required.' : '',
   }
 
@@ -63,7 +80,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   return (
     <div className="auth-screen">
       <div className="auth-visual">
-        <div className="auth-visual-top"><img className="auth-brand-logo theme-logo-dark" src="/brand/smylio-logo.png" alt="" /><img className="auth-brand-logo theme-logo-light" src="/brand/smylio-logo-light.png" alt="" /><span>Smylio <small>RENTING MADE HAPPIER</small></span></div>
+        <Link to="/" className="auth-visual-top"><img className="auth-brand-logo theme-logo-dark" src="/brand/smylio-logo.png" alt="" /><img className="auth-brand-logo theme-logo-light" src="/brand/smylio-logo-light.png" alt="" /><span>Smylio <small>RENTING MADE HAPPIER</small></span></Link>
         <div className="auth-visual-content">
           <p className="eyebrow">TENANT & OWNER MANAGEMENT</p>
           <h1>Every property,<br /><em>in good order.</em></h1>
@@ -71,7 +88,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         </div>
       </div>
       <div className="auth-panel-wrap">
-        <div className="auth-mobile-brand"><img className="auth-brand-logo theme-logo-dark" src="/brand/smylio-logo.png" alt="" /><img className="auth-brand-logo theme-logo-light" src="/brand/smylio-logo-light.png" alt="" /><span>Smylio</span></div>
+        <Link to="/" className="auth-mobile-brand"><img className="auth-brand-logo theme-logo-dark" src="/brand/smylio-logo.png" alt="" /><img className="auth-brand-logo theme-logo-light" src="/brand/smylio-logo-light.png" alt="" /><span>Smylio</span></Link>
         <section className="auth-panel">
           <div className="auth-heading"><div className="auth-icon"><LockKeyhole size={18} /></div><p className="eyebrow">{registering ? `CREATE ACCOUNT · STEP ${registrationStep} OF 2` : 'WELCOME BACK'}</p><h2>{registering ? 'Create your account' : 'Sign in to Smylio'}</h2><p>{registering ? registrationStep === 1 ? "Let's start with your full name." : 'Complete your account details.' : 'Use your account credentials to continue.'}</p></div>
           {error && <InlineError>{error}</InlineError>}
@@ -85,7 +102,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                   <input id="password" type={showPassword ? 'text' : 'password'} value={values.password} onChange={(event) => update('password', event.target.value)} onBlur={() => setTouched((current) => ({ ...current, password: true }))} autoComplete={registering ? 'new-password' : 'current-password'} required aria-invalid={Boolean(touched.password && errors.password)} aria-describedby={touched.password && errors.password ? 'password-error' : registering ? 'password-help' : undefined} />
                   <button type="button" className="field-icon-button" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                 </div>
-                {touched.password && errors.password ? <span className="field-error" id="password-error">{errors.password}</span> : registering ? <span className="field-help" id="password-help">At least 8 characters, up to 72 UTF-8 bytes.</span> : null}
+                {touched.password && errors.password ? <span className="field-error" id="password-error">{errors.password}</span> : registering ? <span className="field-help" id="password-help">At least 8 characters.</span> : null}
               </div>
               {registering && <>
                 <Field label="Phone number" id="phone" type="tel" value={values.phone} onChange={(value) => update('phone', value)} onBlur={() => setTouched((current) => ({ ...current, phone: true }))} error={touched.phone ? errors.phone : ''} required autoComplete="tel" />
@@ -104,6 +121,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
 export function ProfilePage() {
   const { token, updateUser } = useAuth()
+  const navigate = useNavigate()
   const [profile, setProfile] = useState<User | null>(null)
   const [form, setForm] = useState({ name: '', email: '', phone: '' })
   const [loading, setLoading] = useState(true)
@@ -118,6 +136,7 @@ export function ProfilePage() {
   const [showNew, setShowNew] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [passwordSaving, setPasswordSaving] = useState(false)
+  const [copiedTenantCode, setCopiedTenantCode] = useState(false)
 
   const load = useCallback(async () => {
     if (!token) return
@@ -136,6 +155,16 @@ export function ProfilePage() {
   }, [token, updateUser])
 
   useEffect(() => { void load() }, [load])
+
+  async function copyTenantCode(code: string) {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopiedTenantCode(true)
+      setTimeout(() => setCopiedTenantCode(false), 2000)
+    } catch {
+      // non-blocking
+    }
+  }
 
   function startEditing() {
     if (!profile) return
@@ -189,7 +218,7 @@ export function ProfilePage() {
       return
     }
     if (new TextEncoder().encode(passwordForm.newPassword).length > 72) {
-      setPasswordModalError('New password must be 72 UTF-8 bytes or fewer.')
+      setPasswordModalError('New password must be 72 characters or fewer.')
       return
     }
     if (passwordForm.newPassword === passwordForm.currentPassword) {
@@ -263,27 +292,114 @@ export function ProfilePage() {
     />
     {!passwordModalOpen && error && <InlineError>{error}</InlineError>}
     {message && <InlineSuccess onDismiss={() => setMessage('')}>{message}</InlineSuccess>}
-    {loading ? <LoadingState label="Loading your profile…" /> : profile ? <Panel title="Profile information" description={profile.role === 'TENANT' ? 'Your tenant ID and account creation date are read-only.' : 'Your account creation date is read-only.'}>
-      {editing ? <form className="form-stack profile-form" onSubmit={save} noValidate>
-        <Field label="Full name" id="profile-name" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} required autoComplete="name" />
-        <Field label="Email address" id="profile-email" type="email" value={form.email} onChange={(value) => setForm((current) => ({ ...current, email: value }))} required autoComplete="email" />
-        <Field label="Phone number" id="profile-phone" type="tel" value={form.phone} onChange={(value) => setForm((current) => ({ ...current, phone: value }))} required autoComplete="tel" />
-        <div className="modal-actions"><button className="button" type="button" disabled={saving} onClick={() => { setEditing(false); setError('') }}>Cancel</button><button className="button button-primary" type="submit" disabled={saving}>{saving ? <><span className="spinner" /> Saving…</> : 'Save changes'}</button></div>
-      </form> : <div className="account-profile-layout">
-        <div className="account-profile-identity">
-          <span className="account-profile-avatar">{profile.name.slice(0, 1).toUpperCase()}</span>
-          <div><strong>{profile.name}</strong><span>{profile.role === 'OWNER' ? 'Owner' : 'Tenant'}</span></div>
+    {loading ? <LoadingState label="Loading your profile…" /> : profile ? <>
+      <Panel title="Profile information" description="Your contact information and primary account details.">
+        {editing ? <form className="form-stack profile-form" onSubmit={save} noValidate>
+          <Field label="Full name" id="profile-name" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} required autoComplete="name" />
+          <Field label="Email address" id="profile-email" type="email" value={form.email} onChange={(value) => setForm((current) => ({ ...current, email: value }))} required autoComplete="email" />
+          <Field label="Phone number" id="profile-phone" type="tel" value={form.phone} onChange={(value) => setForm((current) => ({ ...current, phone: value }))} required autoComplete="tel" />
+          <div className="modal-actions"><button className="button" type="button" disabled={saving} onClick={() => { setEditing(false); setError('') }}>Cancel</button><button className="button button-primary" type="submit" disabled={saving}>{saving ? <><span className="spinner" /> Saving…</> : 'Save changes'}</button></div>
+        </form> : <div className="account-profile-layout">
+          <div className="account-profile-identity">
+            <span className="account-profile-avatar">{profile.name.slice(0, 1).toUpperCase()}</span>
+            <div><strong>{profile.name}</strong><span>{profile.role === 'OWNER' ? 'Owner' : 'Tenant'}</span></div>
+          </div>
+          <div className="account-profile-details">
+            <div className="account-profile-detail"><span className="account-profile-detail-icon"><UserRound size={21} /></span><div><span>Name</span><strong>{profile.name}</strong></div></div>
+            <div className="account-profile-detail"><span className="account-profile-detail-icon"><Mail size={21} /></span><div><span>Email</span><a href={`mailto:${profile.email}`}>{profile.email}</a></div></div>
+            <div className="account-profile-detail"><span className="account-profile-detail-icon"><Phone size={21} /></span><div><span>Phone</span>{profile.phone ? <a href={`tel:${profile.phone}`}>{profile.phone}</a> : <strong>Not provided</strong>}</div></div>
+            <div className="account-profile-detail"><span className="account-profile-detail-icon"><Users size={21} /></span><div><span>Active workspace</span><strong>{profile.role === 'OWNER' ? 'Owner workspace' : 'Tenant portal'}</strong></div></div>
+            {profile.tenantCode && (
+              <div className="account-profile-detail">
+                <span className="account-profile-detail-icon"><IdCard size={21} /></span>
+                <div>
+                  <span>Tenant ID</span>
+                  <div className="profile-tenant-id-row">
+                    <strong>{profile.tenantCode}</strong>
+                    <button
+                      type="button"
+                      className="button button-subtle profile-copy-button"
+                      onClick={() => void copyTenantCode(profile.tenantCode!)}
+                    >
+                      {copiedTenantCode ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy ID</>}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="account-profile-detail"><span className="account-profile-detail-icon"><CalendarDays size={21} /></span><div><span>Created at</span><strong>{formatDate(profile.createdAt)}</strong></div></div>
+          </div>
+        </div>}
+      </Panel>
+
+      <Panel
+        title="Account Workspaces"
+        description="Smylio allows you to seamlessly manage properties as an Owner and rent as a Tenant with a single login."
+        className="profile-workspaces-panel"
+      >
+        <div className="profile-workspaces-grid">
+          {/* Owner Workspace Card */}
+          <div className={`profile-workspace-card ${(profile.roles ?? [profile.role]).includes('OWNER') ? 'workspace-card-enabled' : ''} ${profile.role === 'OWNER' ? 'workspace-card-active' : ''}`}>
+            <div className="workspace-card-header">
+              <div className="workspace-card-title">
+                <div className="workspace-card-icon"><Building2 size={18} /></div>
+                <div>
+                  <strong>Owner Workspace</strong>
+                  <small>Properties, leases & rent collection</small>
+                </div>
+              </div>
+              <span className={`status-badge ${(profile.roles ?? [profile.role]).includes('OWNER') ? 'status-active' : 'status-inactive'}`}>
+                {profile.role === 'OWNER' ? 'Active now' : (profile.roles ?? [profile.role]).includes('OWNER') ? 'Enabled' : 'Not activated'}
+              </span>
+            </div>
+            <p className="workspace-card-desc">
+              List rental properties, invite tenants, track incoming rent payments, and coordinate property repairs.
+            </p>
+            {!(profile.roles ?? [profile.role]).includes('OWNER') && (
+              <div className="workspace-card-footer">
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={() => navigate('/workspace/activate/owner')}
+                >
+                  <Sparkles size={14} /> Activate Owner Workspace
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Tenant Portal Card */}
+          <div className={`profile-workspace-card ${(profile.roles ?? [profile.role]).includes('TENANT') ? 'workspace-card-enabled' : ''} ${profile.role === 'TENANT' ? 'workspace-card-active' : ''}`}>
+            <div className="workspace-card-header">
+              <div className="workspace-card-title">
+                <div className="workspace-card-icon"><Home size={18} /></div>
+                <div>
+                  <strong>Tenant Portal</strong>
+                  <small>My home, rent receipts & repair tickets</small>
+                </div>
+              </div>
+              <span className={`status-badge ${(profile.roles ?? [profile.role]).includes('TENANT') ? 'status-active' : 'status-inactive'}`}>
+                {profile.role === 'TENANT' ? 'Active now' : (profile.roles ?? [profile.role]).includes('TENANT') ? 'Enabled' : 'Not activated'}
+              </span>
+            </div>
+            <p className="workspace-card-desc">
+              Connect to your landlord using your Tenant ID, record rent receipts, and submit maintenance tickets.
+            </p>
+            {!(profile.roles ?? [profile.role]).includes('TENANT') && (
+              <div className="workspace-card-footer">
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={() => navigate('/workspace/activate/tenant')}
+                >
+                  <Sparkles size={14} /> Activate Tenant Portal
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-        <div className="account-profile-details">
-          <div className="account-profile-detail"><span className="account-profile-detail-icon"><UserRound size={21} /></span><div><span>Name</span><strong>{profile.name}</strong></div></div>
-          <div className="account-profile-detail"><span className="account-profile-detail-icon"><Mail size={21} /></span><div><span>Email</span><a href={`mailto:${profile.email}`}>{profile.email}</a></div></div>
-          <div className="account-profile-detail"><span className="account-profile-detail-icon"><Phone size={21} /></span><div><span>Phone</span>{profile.phone ? <a href={`tel:${profile.phone}`}>{profile.phone}</a> : <strong>Not provided</strong>}</div></div>
-          <div className="account-profile-detail"><span className="account-profile-detail-icon"><Users size={21} /></span><div><span>Role</span><strong>{profile.role === 'OWNER' ? 'Owner' : 'Tenant'}</strong></div></div>
-          {profile.role === 'TENANT' && <div className="account-profile-detail"><span className="account-profile-detail-icon"><IdCard size={21} /></span><div><span>Tenant ID</span><strong>{profile.tenantCode}</strong></div></div>}
-          <div className="account-profile-detail"><span className="account-profile-detail-icon"><CalendarDays size={21} /></span><div><span>Created at</span><strong>{formatDate(profile.createdAt)}</strong></div></div>
-        </div>
-      </div>}
-    </Panel> : null}
+      </Panel>
+    </> : null}
     {passwordModalOpen && <Modal title="Change password" description="Verify your current password and choose a new one." onClose={() => { setPasswordModalOpen(false); setPasswordModalError('') }} error={passwordModalError}>
       <form className="form-stack" onSubmit={handlePasswordChange} noValidate>
         <div className="field-group">
@@ -299,7 +415,7 @@ export function ProfilePage() {
             <input id="new-password" type={showNew ? 'text' : 'password'} value={passwordForm.newPassword} onChange={(e) => setPasswordForm((c) => ({ ...c, newPassword: e.target.value }))} required autoComplete="new-password" placeholder="At least 8 characters" />
             <button type="button" className="field-icon-button" onClick={() => setShowNew((c) => !c)} aria-label={showNew ? 'Hide new password' : 'Show new password'}>{showNew ? <EyeOff size={16} /> : <Eye size={16} />}</button>
           </div>
-          <span className="field-help">Must be at least 8 characters and up to 72 UTF-8 bytes.</span>
+          <span className="field-help">Must be at least 8 characters.</span>
         </div>
         <div className="field-group">
           <label htmlFor="confirm-password">Confirm new password <span className="required-mark">*</span></label>

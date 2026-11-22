@@ -83,7 +83,86 @@ class UserServiceAndAuthHardeningTest {
         assertNotNull(response.getTenantCode());
         assertTrue(CROCKFORD_TENANT_CODE.matcher(response.getTenantCode()).matches());
         assertEquals("Asha Verma", response.getName());
+        assertEquals("TENANT", response.getRole());
+        assertNotNull(response.getRoles());
+        assertTrue(response.getRoles().contains("TENANT"));
         verify(userRepository, times(1)).save(any(User.class));
+    }
+
+    @Test
+    void userEntitySupportsMultiRoleWithBackwardCompatibility() {
+        User user = new User();
+        user.setRole(UserRole.OWNER);
+
+        assertTrue(user.hasRole(UserRole.OWNER));
+        assertEquals(1, user.getRoles().size());
+        assertTrue(user.getRoles().contains(UserRole.OWNER));
+
+        user.addRole(UserRole.TENANT);
+        assertTrue(user.hasRole(UserRole.OWNER));
+        assertTrue(user.hasRole(UserRole.TENANT));
+        assertEquals(2, user.getRoles().size());
+    }
+
+    @Test
+    void activateRoleEnablesTenantAndGeneratesTenantCode() {
+        User owner = new User();
+        owner.setId(21L);
+        owner.setName("Piyush Owner");
+        owner.setEmail("piyush@example.com");
+        owner.setRole(UserRole.OWNER);
+        owner.addRole(UserRole.OWNER);
+
+        when(userRepository.findById(21L)).thenReturn(Optional.of(owner));
+        when(userRepository.existsByTenantCode(anyString())).thenReturn(false);
+        when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+        when(jwtTokenService.createToken(any(User.class))).thenReturn("fake-jwt-token");
+        when(jwtTokenService.getExpirationSeconds()).thenReturn(900L);
+
+        var authResponse = userService.activateRole(21L, "TENANT");
+
+        assertNotNull(authResponse.getAccessToken());
+        assertEquals("Bearer", authResponse.getTokenType());
+        assertEquals("TENANT", authResponse.getUser().getRole());
+        assertTrue(authResponse.getUser().getRoles().contains("TENANT"));
+        assertTrue(authResponse.getUser().getRoles().contains("OWNER"));
+        assertNotNull(authResponse.getUser().getTenantCode());
+        assertTrue(CROCKFORD_TENANT_CODE.matcher(authResponse.getUser().getTenantCode()).matches());
+    }
+
+    @Test
+    void switchRoleSwitchesActiveRoleBetweenEnabledRoles() {
+        User dualRole = new User();
+        dualRole.setId(21L);
+        dualRole.setName("Piyush Dual");
+        dualRole.setEmail("piyush@example.com");
+        dualRole.setRole(UserRole.OWNER);
+        dualRole.addRole(UserRole.OWNER);
+        dualRole.addRole(UserRole.TENANT);
+        dualRole.setTenantCode("TNT-12345678");
+
+        when(userRepository.findById(21L)).thenReturn(Optional.of(dualRole));
+        when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+        when(jwtTokenService.createToken(any(User.class))).thenReturn("fake-jwt-token-tenant");
+        when(jwtTokenService.getExpirationSeconds()).thenReturn(900L);
+
+        var authResponse = userService.switchRole(21L, "TENANT");
+
+        assertEquals("TENANT", authResponse.getUser().getRole());
+        assertTrue(authResponse.getUser().getRoles().contains("OWNER"));
+        assertTrue(authResponse.getUser().getRoles().contains("TENANT"));
+    }
+
+    @Test
+    void switchRoleRejectsUnactivatedRole() {
+        User ownerOnly = new User();
+        ownerOnly.setId(22L);
+        ownerOnly.setRole(UserRole.OWNER);
+        ownerOnly.addRole(UserRole.OWNER);
+
+        when(userRepository.findById(22L)).thenReturn(Optional.of(ownerOnly));
+
+        assertThrows(IllegalArgumentException.class, () -> userService.switchRole(22L, "TENANT"));
     }
 
     @Test

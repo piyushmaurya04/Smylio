@@ -248,7 +248,7 @@ public class MaintenanceService {
     }
 
     private void requireRole(User user, UserRole requiredRole) {
-        if (requiredRole != user.getRole()) {
+        if (!user.hasRole(requiredRole)) {
             logger.warn("Maintenance access rejected: userId={} actualRole={} requiredRole={}",
                     user.getId(), user.getRole(), requiredRole);
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This action is not allowed for this user role");
@@ -294,7 +294,18 @@ public class MaintenanceService {
         response.setRequestId(comment.getRequest().getId());
         response.setUserId(comment.getUser().getId());
         response.setUserName(comment.getUser().getName());
-        response.setUserRole(comment.getUser().getRole() != null ? comment.getUser().getRole().name() : null);
+
+        String roleName;
+        if (comment.getRequest() != null && comment.getRequest().getProperty() != null
+                && comment.getUser().getId().equals(comment.getRequest().getProperty().getOwnerId())) {
+            roleName = UserRole.OWNER.name();
+        } else if (comment.getRequest() != null && comment.getRequest().getTenant() != null
+                && comment.getUser().getId().equals(comment.getRequest().getTenant().getId())) {
+            roleName = UserRole.TENANT.name();
+        } else {
+            roleName = comment.getUser().getRole() != null ? comment.getUser().getRole().name() : null;
+        }
+        response.setUserRole(roleName);
         response.setComment(comment.getComment());
         response.setCreatedAt(comment.getCreatedAt());
         return response;

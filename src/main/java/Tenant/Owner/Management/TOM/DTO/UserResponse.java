@@ -1,6 +1,7 @@
 package Tenant.Owner.Management.TOM.DTO;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -13,6 +14,7 @@ public class UserResponse {
     private String email;
     private String phone;
     private String role;
+    private List<String> roles;
     private String tenantCode;
     private LocalDateTime createdAt;
 }

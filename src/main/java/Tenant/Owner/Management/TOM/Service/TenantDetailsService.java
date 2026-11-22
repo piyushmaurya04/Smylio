@@ -40,7 +40,7 @@ public class TenantDetailsService {
         }
 
         User tenant = userRepository.findById(tenantId)
-                .filter(user -> UserRole.TENANT == user.getRole())
+                .filter(user -> user.hasRole(UserRole.TENANT))
                 .orElseThrow(() -> new NoSuchElementException("Tenant not found for this owner"));
 
         TenantDetailsResponse response = new TenantDetailsResponse();

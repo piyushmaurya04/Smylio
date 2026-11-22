@@ -21,14 +21,23 @@ public class TenantService {
 
     @Transactional(readOnly = true)
     public TenantSearchResponse findByTenantCode(String code) {
+        return findByTenantCode(code, null);
+    }
+
+    @Transactional(readOnly = true)
+    public TenantSearchResponse findByTenantCode(String code, Long callerUserId) {
         if (code == null || code.isBlank()) {
             throw new IllegalArgumentException("Tenant code must not be blank");
         }
 
         String normalizedCode = code.trim().toUpperCase(Locale.ROOT);
         User tenant = userRepository.findByTenantCode(normalizedCode)
-                .filter(user -> UserRole.TENANT == user.getRole())
+                .filter(user -> user.hasRole(UserRole.TENANT))
                 .orElseThrow(() -> new NoSuchElementException("Tenant not found for code: " + normalizedCode));
+
+        if (callerUserId != null && tenant.getId().equals(callerUserId)) {
+            throw new IllegalArgumentException("This is your own Tenant Code. You cannot lease a property to yourself.");
+        }
 
         TenantSearchResponse response = new TenantSearchResponse();
         response.setName(tenant.getName());

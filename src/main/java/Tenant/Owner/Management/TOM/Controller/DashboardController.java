@@ -7,6 +7,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 import Tenant.Owner.Management.TOM.DTO.OwnerDashboardResponse;
+import Tenant.Owner.Management.TOM.DTO.WorkspaceBadgesResponse;
 import Tenant.Owner.Management.TOM.Service.DashboardService;
 import Tenant.Owner.Management.TOM.Security.JwtPrincipal;
 
@@ -23,5 +24,10 @@ public class DashboardController {
     public OwnerDashboardResponse getOwnerDashboard(@AuthenticationPrincipal Jwt jwt) {
         Long ownerId = JwtPrincipal.userId(jwt);
         return dashboardService.getOwnerDashboard(ownerId);
+    }
+
+    @GetMapping("/badges")
+    public WorkspaceBadgesResponse getBadges(@AuthenticationPrincipal Jwt jwt) {
+        return dashboardService.getWorkspaceBadges(JwtPrincipal.userId(jwt));
     }
 }

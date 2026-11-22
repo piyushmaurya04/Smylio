@@ -71,6 +71,10 @@ public class AuthService {
         response.setEmail(user.getEmail());
         response.setPhone(user.getPhone());
         response.setRole(user.getRole() != null ? user.getRole().name() : null);
+        java.util.List<String> roleList = user.getRoles() != null && !user.getRoles().isEmpty()
+                ? user.getRoles().stream().map(Enum::name).sorted().toList()
+                : user.getRole() != null ? java.util.List.of(user.getRole().name()) : java.util.List.of();
+        response.setRoles(roleList);
         response.setTenantCode(user.getTenantCode());
         response.setCreatedAt(user.getCreatedAt());
         return response;

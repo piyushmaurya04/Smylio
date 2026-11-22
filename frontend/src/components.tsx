@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { X } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from 'lucide-react'
 import { errorMessage } from './api'
 import { isNoticeUnread, NOTICE_READ_EVENT, timeUntilNoticeExpires } from './notice-status'
 
@@ -14,8 +15,55 @@ export function Panel({ title, description, action, children, className = '' }: 
   </section>
 }
 
-export function StatCard({ label, value, detail, tone = 'neutral' }: { label: string; value: string; detail?: string; tone?: 'neutral' | 'accent' | 'warning' }) {
-  return <div className={`stat-card stat-${tone}`}><span>{label}</span><strong>{value}</strong>{detail && <small>{detail}</small>}</div>
+export function StatCard({
+  label,
+  value,
+  detail,
+  tone = 'neutral',
+  to,
+  ariaLabel,
+}: {
+  label: string
+  value: string
+  detail?: string
+  tone?: 'neutral' | 'accent' | 'warning'
+  to?: string
+  ariaLabel?: string
+}) {
+  const navigate = useNavigate()
+  return (
+    <div
+      className={`stat-card stat-${tone}${to ? ' stat-card-interactive' : ''}`}
+      onClick={to ? () => navigate(to) : undefined}
+      role={to ? 'link' : undefined}
+      tabIndex={to ? 0 : undefined}
+      onKeyDown={
+        to
+          ? (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                navigate(to)
+              }
+            }
+          : undefined
+      }
+    >
+      <span>{label}</span>
+      {to ? (
+        <Link
+          to={to}
+          className="stat-card-value-link"
+          aria-label={ariaLabel || `${label}: ${value}`}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {value}
+        </Link>
+      ) : (
+        <strong>{value}</strong>
+      )}
+      {detail && <small>{detail}</small>}
+    </div>
+  )
 }
 
 export function EmptyState({ title, detail, action }: { title: string; detail: string; action?: ReactNode }) {
@@ -32,6 +80,7 @@ export function AutoDismissAlert({
   role = 'status',
   autoDismiss = true,
   duration = 10000,
+  icon,
   onDismiss,
 }: {
   children: ReactNode
@@ -39,6 +88,7 @@ export function AutoDismissAlert({
   role?: string
   autoDismiss?: boolean
   duration?: number
+  icon?: ReactNode
   onDismiss?: () => void
 }) {
   const [phase, setPhase] = useState<'visible' | 'dissolving' | 'hidden'>('visible')
@@ -69,9 +119,39 @@ export function AutoDismissAlert({
 
   if (phase === 'hidden') return null
 
+  function dismissNow() {
+    setPhase('dissolving')
+    window.setTimeout(() => {
+      setPhase('hidden')
+      onDismissRef.current?.()
+    }, 300)
+  }
+
   const animationClass = phase === 'dissolving' ? 'alert-dissolving' : 'alert-enter'
 
-  return <div className={`alert ${className} ${animationClass}`.trim()} role={role}>{children}</div>
+  return (
+    <div className={`alert ${className} ${animationClass}`.trim()} role={role}>
+      {icon && <span className="alert-icon-wrap">{icon}</span>}
+      <div className="alert-body">{children}</div>
+      {onDismiss && (
+        <button
+          type="button"
+          className="alert-dismiss"
+          onClick={dismissNow}
+          aria-label="Dismiss notification"
+          title="Dismiss notification"
+        >
+          <X size={15} />
+        </button>
+      )}
+      {autoDismiss && (
+        <span
+          className="alert-progress-line"
+          style={{ animationDuration: `${duration}ms` }}
+        />
+      )}
+    </div>
+  )
 }
 
 export function InlineError({ children, autoDismiss = false, duration = 10000, onDismiss }: {
@@ -80,7 +160,18 @@ export function InlineError({ children, autoDismiss = false, duration = 10000, o
   duration?: number
   onDismiss?: () => void
 }) {
-  return <AutoDismissAlert className="alert-error" role="alert" autoDismiss={autoDismiss} duration={duration} onDismiss={onDismiss}>{children}</AutoDismissAlert>
+  return (
+    <AutoDismissAlert
+      className="alert-error"
+      role="alert"
+      autoDismiss={autoDismiss}
+      duration={duration}
+      icon={<AlertCircle size={17} className="alert-icon" />}
+      onDismiss={onDismiss}
+    >
+      {children}
+    </AutoDismissAlert>
+  )
 }
 
 export function InlineSuccess({ children, autoDismiss = true, duration = 10000, onDismiss }: {
@@ -89,7 +180,18 @@ export function InlineSuccess({ children, autoDismiss = true, duration = 10000, 
   duration?: number
   onDismiss?: () => void
 }) {
-  return <AutoDismissAlert className="alert-success" role="status" autoDismiss={autoDismiss} duration={duration} onDismiss={onDismiss}>{children}</AutoDismissAlert>
+  return (
+    <AutoDismissAlert
+      className="alert-success"
+      role="status"
+      autoDismiss={autoDismiss}
+      duration={duration}
+      icon={<CheckCircle2 size={17} className="alert-icon" />}
+      onDismiss={onDismiss}
+    >
+      {children}
+    </AutoDismissAlert>
+  )
 }
 
 export function InlineWarning({ children, autoDismiss = true, duration = 10000, onDismiss }: {
@@ -98,7 +200,18 @@ export function InlineWarning({ children, autoDismiss = true, duration = 10000, 
   duration?: number
   onDismiss?: () => void
 }) {
-  return <AutoDismissAlert className="alert-warning" role="alert" autoDismiss={autoDismiss} duration={duration} onDismiss={onDismiss}>{children}</AutoDismissAlert>
+  return (
+    <AutoDismissAlert
+      className="alert-warning"
+      role="alert"
+      autoDismiss={autoDismiss}
+      duration={duration}
+      icon={<AlertTriangle size={17} className="alert-icon" />}
+      onDismiss={onDismiss}
+    >
+      {children}
+    </AutoDismissAlert>
+  )
 }
 
 export function InlineNotice({ children, autoDismiss = true, duration = 10000, onDismiss }: {
@@ -107,7 +220,18 @@ export function InlineNotice({ children, autoDismiss = true, duration = 10000, o
   duration?: number
   onDismiss?: () => void
 }) {
-  return <AutoDismissAlert className="alert-info" role="status" autoDismiss={autoDismiss} duration={duration} onDismiss={onDismiss}>{children}</AutoDismissAlert>
+  return (
+    <AutoDismissAlert
+      className="alert-info"
+      role="status"
+      autoDismiss={autoDismiss}
+      duration={duration}
+      icon={<Info size={17} className="alert-icon" />}
+      onDismiss={onDismiss}
+    >
+      {children}
+    </AutoDismissAlert>
+  )
 }
 
 export function StatusBadge({ status }: { status: string }) {
@@ -138,7 +262,7 @@ export function DataTable({ children, headings }: { children: ReactNode; heading
   return <div className="table-scroll"><table><thead><tr>{headings.map((heading) => <th key={heading}>{heading}</th>)}</tr></thead><tbody>{children}</tbody></table></div>
 }
 
-export function Modal({ title, description, onClose, children, wide = false, confirmation = false, error }: {
+export function Modal({ title, description, onClose, children, wide = false, confirmation = false, error, warning }: {
   title: string
   description?: string
   onClose: () => void
@@ -146,6 +270,7 @@ export function Modal({ title, description, onClose, children, wide = false, con
   wide?: boolean
   confirmation?: boolean
   error?: string
+  warning?: string
 }) {
   useEffect(() => {
     function onKey(event: KeyboardEvent) { if (event.key === 'Escape') onClose() }
@@ -159,6 +284,7 @@ export function Modal({ title, description, onClose, children, wide = false, con
       <header className="modal-header"><div><h2 id="modal-title">{title}</h2>{description && <p>{description}</p>}</div><button type="button" className="icon-button" aria-label="Close dialog" onClick={onClose}><X size={17} /></button></header>
       <div className="modal-content">
         {error && <InlineError>{error}</InlineError>}
+        {warning && <InlineWarning autoDismiss={false}>{warning}</InlineWarning>}
         {children}
       </div>
     </section>
@@ -181,9 +307,29 @@ export function ConfirmationDialog({ title, description, confirmLabel, onConfirm
     }
   }
 
-  return <Modal title={title} description={description} onClose={onCancel} confirmation error={dialogError}>
-    <div className="modal-actions"><button type="button" className="button" disabled={busy} onClick={onCancel}>Cancel</button><button type="button" className="button button-danger" disabled={busy} onClick={() => void confirm()}>{busy ? <span className="spinner" /> : null}{confirmLabel}</button></div>
-  </Modal>
+  return (
+    <Modal title={title} onClose={onCancel} confirmation error={dialogError}>
+      {description && (
+        <div style={{ marginBottom: '16px' }}>
+          <InlineWarning autoDismiss={false}>{description}</InlineWarning>
+        </div>
+      )}
+      <div className="modal-actions">
+        <button type="button" className="button" disabled={busy} onClick={onCancel}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="button button-danger"
+          disabled={busy}
+          onClick={() => void confirm()}
+        >
+          {busy ? <span className="spinner" /> : null}
+          {confirmLabel}
+        </button>
+      </div>
+    </Modal>
+  )
 }
 
 export function Field({ label, id, type = 'text', value, onChange, onBlur, error, hint, required = false, min, step, placeholder, autoComplete }: {

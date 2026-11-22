@@ -6,8 +6,16 @@ export interface User {
   email: string
   phone?: string | null
   role: Role
+  roles?: Role[]
   tenantCode?: string | null
   createdAt?: string | null
+}
+
+export interface WorkspaceBadges {
+  ownerPendingApprovals: number
+  ownerOpenTickets: number
+  tenantPendingRents: number
+  tenantUnreadNotices: number
 }
 
 export interface AuthResponse {

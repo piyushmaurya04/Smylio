@@ -12,16 +12,21 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import Tenant.Owner.Management.TOM.DTO.AuthResponse;
 import Tenant.Owner.Management.TOM.DTO.ChangePasswordRequest;
 import Tenant.Owner.Management.TOM.DTO.ProfileUpdateRequest;
+import Tenant.Owner.Management.TOM.DTO.SwitchRoleRequest;
 import Tenant.Owner.Management.TOM.DTO.UserResponse;
+import Tenant.Owner.Management.TOM.DTO.WorkspaceBadgesResponse;
 import Tenant.Owner.Management.TOM.Security.JwtPrincipal;
 import Tenant.Owner.Management.TOM.Security.RateLimitService;
+import Tenant.Owner.Management.TOM.Service.DashboardService;
 import Tenant.Owner.Management.TOM.Service.RefreshTokenService;
 import Tenant.Owner.Management.TOM.Service.UserService;
 
@@ -33,15 +38,18 @@ public class ProfileController {
     private final UserService userService;
     private final RefreshTokenService refreshTokenService;
     private final RateLimitService rateLimitService;
+    private final DashboardService dashboardService;
     private final String cookieSecureMode;
 
     public ProfileController(UserService userService,
             RefreshTokenService refreshTokenService,
             RateLimitService rateLimitService,
+            DashboardService dashboardService,
             @Value("${app.security.refresh.cookie-secure:auto}") String cookieSecureMode) {
         this.userService = userService;
         this.refreshTokenService = refreshTokenService;
         this.rateLimitService = rateLimitService;
+        this.dashboardService = dashboardService;
         this.cookieSecureMode = cookieSecureMode;
     }
 
@@ -74,6 +82,29 @@ public class ProfileController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
                 .body(Map.of("message", "Password changed successfully"));
+    }
+
+    @PostMapping("/roles/activate")
+    public AuthResponse activateRole(
+            @Valid @RequestBody SwitchRoleRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        Long userId = JwtPrincipal.userId(jwt);
+        rateLimitService.consumeActivateRole(userId);
+        return userService.activateRole(userId, request.getRole());
+    }
+
+    @PostMapping("/switch-role")
+    public AuthResponse switchRole(
+            @Valid @RequestBody SwitchRoleRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        Long userId = JwtPrincipal.userId(jwt);
+        rateLimitService.consumeSwitchRole(userId);
+        return userService.switchRole(userId, request.getRole());
+    }
+
+    @GetMapping("/badges")
+    public WorkspaceBadgesResponse getBadges(@AuthenticationPrincipal Jwt jwt) {
+        return dashboardService.getWorkspaceBadges(JwtPrincipal.userId(jwt));
     }
 
     private ResponseCookie buildRefreshCookie(String value, Duration maxAge, HttpServletRequest httpRequest) {

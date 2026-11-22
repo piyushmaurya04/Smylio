@@ -15,6 +15,7 @@ import type {
   TenantDetails,
   TenantSearchResult,
   User,
+  WorkspaceBadges,
 } from './types'
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || ''
@@ -112,6 +113,15 @@ export const api = {
   },
   async profile(token: string) {
     return (await client(token).get<User>('/api/profile')).data
+  },
+  async activateRole(token: string, role: Role) {
+    return (await client(token).post<AuthResponse>('/api/profile/roles/activate', { role })).data
+  },
+  async switchRole(token: string, role: Role) {
+    return (await client(token).post<AuthResponse>('/api/profile/switch-role', { role })).data
+  },
+  async workspaceBadges(token: string) {
+    return (await client(token).get<WorkspaceBadges>('/api/profile/badges')).data
   },
   async updateProfile(token: string, body: Pick<User, 'name' | 'email' | 'phone'>) {
     return (await client(token).put<User>('/api/profile', body)).data

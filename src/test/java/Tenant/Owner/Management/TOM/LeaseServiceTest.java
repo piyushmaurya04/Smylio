@@ -2,6 +2,7 @@ package Tenant.Owner.Management.TOM;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -178,6 +179,30 @@ class LeaseServiceTest {
         assertEquals(LocalDate.of(2026, 3, 15), response.getEndDate());
         assertEquals(PropertyStatus.AVAILABLE, property.getStatus());
         verify(rentService).generateFinalRentOnLeaseEnd(active, LocalDate.of(2026, 3, 15));
+    }
+
+    @Test
+    void rejectsSelfLeasingWhenTenantIsSameAsOwner() {
+        Property property = new Property();
+        property.setId(3L);
+        property.setOwnerId(11L);
+        property.setStatus(PropertyStatus.AVAILABLE);
+
+        User dualRoleSelf = new User();
+        dualRoleSelf.setId(11L); // Same as ownerId
+        dualRoleSelf.setRole(UserRole.TENANT);
+        dualRoleSelf.setTenantCode("TNT-SELF");
+
+        when(propertyRepository.findByIdAndOwnerIdForUpdate(3L, 11L)).thenReturn(Optional.of(property));
+        when(leaseRepository.existsByPropertyIdAndStatus(3L, LeaseStatus.ACTIVE)).thenReturn(false);
+        when(userRepository.findByTenantCode("TNT-SELF")).thenReturn(Optional.of(dualRoleSelf));
+
+        LeaseRequest request = validRequest();
+        request.setTenantCode("TNT-SELF");
+
+        var ex = assertThrows(IllegalArgumentException.class, () -> leaseService.create(request, 11L));
+        assertTrue(ex.getMessage().contains("An owner cannot create a lease for themselves as the tenant"));
+        verify(leaseRepository, never()).save(any());
     }
 
     private LeaseRequest validRequest() {

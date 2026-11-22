@@ -369,7 +369,7 @@ public class RentService {
     }
 
     private void requireRole(User user, UserRole requiredRole) {
-        if (requiredRole != user.getRole()) {
+        if (!user.hasRole(requiredRole)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "This action is not allowed for this user role");
         }
