@@ -93,9 +93,9 @@ export function OwnerDashboardPage() {
 
     {loading || !summary ? <LoadingState /> : <>
       <div className="stats-grid">
-        <StatCard label="Active tenants" value={String(summary.tenantCount)} detail="Across active leases" />
+        <StatCard label="Active tenants" value={String(summary.tenantCount)} detail="Across active leases" to="/owner/leases" />
         <StatCard label="Outstanding rent" value={formatCurrency(summary.pendingRent)} detail="Includes accrued fines" tone="accent" />
-        <StatCard label="Open issues" value={String(summary.openMaintenanceCount)} detail="Open or in progress" tone={summary.openMaintenanceCount ? 'warning' : 'neutral'} />
+        <StatCard label="Open issues" value={String(summary.openMaintenanceCount)} detail="Open or in progress" tone={summary.openMaintenanceCount ? 'warning' : 'neutral'} to="/owner/maintenance" />
       </div>
       <div className="dashboard-grid">
         <Panel className="cash-approval-panel" title="Cash payment approvals" description={`${approvals.length} awaiting your review`} action={<button className="button button-quiet" onClick={() => void generate()} disabled={busy !== null}>{busy === -1 ? <span className="spinner" /> : <RefreshCw size={14} />} Generate rent</button>}>

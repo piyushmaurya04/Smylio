@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from 'lucide-react'
 import { errorMessage } from './api'
 import { isNoticeUnread, NOTICE_READ_EVENT, timeUntilNoticeExpires } from './notice-status'
@@ -14,8 +15,55 @@ export function Panel({ title, description, action, children, className = '' }: 
   </section>
 }
 
-export function StatCard({ label, value, detail, tone = 'neutral' }: { label: string; value: string; detail?: string; tone?: 'neutral' | 'accent' | 'warning' }) {
-  return <div className={`stat-card stat-${tone}`}><span>{label}</span><strong>{value}</strong>{detail && <small>{detail}</small>}</div>
+export function StatCard({
+  label,
+  value,
+  detail,
+  tone = 'neutral',
+  to,
+  ariaLabel,
+}: {
+  label: string
+  value: string
+  detail?: string
+  tone?: 'neutral' | 'accent' | 'warning'
+  to?: string
+  ariaLabel?: string
+}) {
+  const navigate = useNavigate()
+  return (
+    <div
+      className={`stat-card stat-${tone}${to ? ' stat-card-interactive' : ''}`}
+      onClick={to ? () => navigate(to) : undefined}
+      role={to ? 'link' : undefined}
+      tabIndex={to ? 0 : undefined}
+      onKeyDown={
+        to
+          ? (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                navigate(to)
+              }
+            }
+          : undefined
+      }
+    >
+      <span>{label}</span>
+      {to ? (
+        <Link
+          to={to}
+          className="stat-card-value-link"
+          aria-label={ariaLabel || `${label}: ${value}`}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {value}
+        </Link>
+      ) : (
+        <strong>{value}</strong>
+      )}
+      {detail && <small>{detail}</small>}
+    </div>
+  )
 }
 
 export function EmptyState({ title, detail, action }: { title: string; detail: string; action?: ReactNode }) {
