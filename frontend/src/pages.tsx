@@ -45,7 +45,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const errors = {
     name: registering && !values.name.trim() ? 'Enter your name.' : '',
     email: !values.email.trim() ? 'Email is required.' : !emailValid ? 'Enter a valid email address.' : '',
-    password: !values.password ? 'Password is required.' : registering && values.password.length < 8 ? 'Use at least 8 characters.' : registering && passwordBytes > 72 ? 'Password must be 72 UTF-8 bytes or fewer.' : '',
+    password: !values.password ? 'Password is required.' : registering && values.password.length < 8 ? 'Use at least 8 characters.' : registering && passwordBytes > 72 ? 'Password must be 72 characters or fewer.' : '',
     phone: registering && !values.phone.trim() ? 'Phone number is required.' : '',
   }
 
@@ -102,7 +102,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                   <input id="password" type={showPassword ? 'text' : 'password'} value={values.password} onChange={(event) => update('password', event.target.value)} onBlur={() => setTouched((current) => ({ ...current, password: true }))} autoComplete={registering ? 'new-password' : 'current-password'} required aria-invalid={Boolean(touched.password && errors.password)} aria-describedby={touched.password && errors.password ? 'password-error' : registering ? 'password-help' : undefined} />
                   <button type="button" className="field-icon-button" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                 </div>
-                {touched.password && errors.password ? <span className="field-error" id="password-error">{errors.password}</span> : registering ? <span className="field-help" id="password-help">At least 8 characters, up to 72 UTF-8 bytes.</span> : null}
+                {touched.password && errors.password ? <span className="field-error" id="password-error">{errors.password}</span> : registering ? <span className="field-help" id="password-help">At least 8 characters.</span> : null}
               </div>
               {registering && <>
                 <Field label="Phone number" id="phone" type="tel" value={values.phone} onChange={(value) => update('phone', value)} onBlur={() => setTouched((current) => ({ ...current, phone: true }))} error={touched.phone ? errors.phone : ''} required autoComplete="tel" />
@@ -218,7 +218,7 @@ export function ProfilePage() {
       return
     }
     if (new TextEncoder().encode(passwordForm.newPassword).length > 72) {
-      setPasswordModalError('New password must be 72 UTF-8 bytes or fewer.')
+      setPasswordModalError('New password must be 72 characters or fewer.')
       return
     }
     if (passwordForm.newPassword === passwordForm.currentPassword) {
@@ -415,7 +415,7 @@ export function ProfilePage() {
             <input id="new-password" type={showNew ? 'text' : 'password'} value={passwordForm.newPassword} onChange={(e) => setPasswordForm((c) => ({ ...c, newPassword: e.target.value }))} required autoComplete="new-password" placeholder="At least 8 characters" />
             <button type="button" className="field-icon-button" onClick={() => setShowNew((c) => !c)} aria-label={showNew ? 'Hide new password' : 'Show new password'}>{showNew ? <EyeOff size={16} /> : <Eye size={16} />}</button>
           </div>
-          <span className="field-help">Must be at least 8 characters and up to 72 UTF-8 bytes.</span>
+          <span className="field-help">Must be at least 8 characters.</span>
         </div>
         <div className="field-group">
           <label htmlFor="confirm-password">Confirm new password <span className="required-mark">*</span></label>

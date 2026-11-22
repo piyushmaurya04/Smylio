@@ -5,16 +5,17 @@ import {
   Bell,
   Building2,
   Check,
-  ChevronDown,
+  ChevronRight,
   CircleHelp,
   CreditCard,
   Home,
   LogOut,
   Menu,
   Moon,
+  MoreHorizontal,
+  Settings,
   Sparkles,
   Sun,
-  UserRound,
   Users,
   Wrench,
   X,
@@ -28,20 +29,64 @@ import { FaqPage } from './faq'
 
 type Theme = 'dark' | 'light'
 
-const ownerLinks = [
-  { to: '/owner/overview', label: 'Overview', icon: Home },
-  { to: '/owner/properties', label: 'Properties', icon: Building2 },
-  { to: '/owner/leases', label: 'Tenants & leases', icon: Users },
-  { to: '/owner/rent', label: 'Rent', icon: CreditCard },
-  { to: '/owner/maintenance', label: 'Maintenance', icon: Wrench },
-  { to: '/owner/notices', label: 'Notices', icon: Bell },
+interface NavItem {
+  to: string
+  label: string
+  icon: typeof Home
+}
+
+interface NavSection {
+  title: string
+  items: NavItem[]
+}
+
+const ownerNavSections: NavSection[] = [
+  {
+    title: 'MANAGE',
+    items: [
+      { to: '/owner/overview', label: 'Overview', icon: Home },
+      { to: '/owner/properties', label: 'Properties', icon: Building2 },
+      { to: '/owner/leases', label: 'Tenants & Leases', icon: Users },
+    ],
+  },
+  {
+    title: 'OPERATIONS',
+    items: [
+      { to: '/owner/rent', label: 'Payments', icon: CreditCard },
+      { to: '/owner/maintenance', label: 'Maintenance', icon: Wrench },
+    ],
+  },
+  {
+    title: 'ACCOUNT',
+    items: [
+      { to: '/settings', label: 'Settings', icon: Settings },
+      { to: '/faq', label: 'FAQ', icon: CircleHelp },
+    ],
+  },
 ]
 
-const tenantLinks = [
-  { to: '/tenant/overview', label: 'My home', icon: Home },
-  { to: '/tenant/rent', label: 'Rent', icon: CreditCard },
-  { to: '/tenant/maintenance', label: 'Maintenance', icon: Wrench },
-  { to: '/tenant/notices', label: 'Notices', icon: Bell },
+const tenantNavSections: NavSection[] = [
+  {
+    title: 'MANAGE',
+    items: [
+      { to: '/tenant/overview', label: 'My home', icon: Home },
+    ],
+  },
+  {
+    title: 'OPERATIONS',
+    items: [
+      { to: '/tenant/rent', label: 'Payments', icon: CreditCard },
+      { to: '/tenant/maintenance', label: 'Maintenance', icon: Wrench },
+      { to: '/tenant/notices', label: 'Notices', icon: Bell },
+    ],
+  },
+  {
+    title: 'ACCOUNT',
+    items: [
+      { to: '/settings', label: 'Settings', icon: Settings },
+      { to: '/faq', label: 'FAQ', icon: CircleHelp },
+    ],
+  },
 ]
 
 function AuthenticatedLayout() {
@@ -50,13 +95,20 @@ function AuthenticatedLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [confirmSignOut, setConfirmSignOut] = useState(false)
   const [workspaceExpanded, setWorkspaceExpanded] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [switching, setSwitching] = useState(false)
   const [workspaceNotice, setWorkspaceNotice] = useState('')
   const prevRoleRef = useRef(user?.role)
+  const userMenuRef = useRef<HTMLDivElement>(null)
+  const workspaceRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
   const navigate = useNavigate()
-  const links = user?.role === 'OWNER' ? ownerLinks : tenantLinks
-  const pageTitle = links.find((link) => location.pathname.startsWith(link.to))?.label || 'Overview'
+
+  const navSections = user?.role === 'OWNER' ? ownerNavSections : tenantNavSections
+  const allNavItems = navSections.flatMap((section) => section.items)
+  const matchedNavItem = allNavItems.find((link) => location.pathname.startsWith(link.to))
+  const pageTitle = matchedNavItem?.label || 'Overview'
+
   const noticesPath = user?.role === 'OWNER' ? '/owner/notices' : '/tenant/notices'
   const isNoticeDetail = location.pathname.startsWith(`${noticesPath}/`)
   const maintenancePath = user?.role === 'OWNER' ? '/owner/maintenance' : '/tenant/maintenance'
@@ -82,7 +134,35 @@ function AuthenticatedLayout() {
     localStorage.setItem('tom-theme', theme)
   }, [theme])
 
-  useEffect(() => setMobileOpen(false), [location.pathname])
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
+        setUserMenuOpen(false)
+      }
+      if (workspaceRef.current && !workspaceRef.current.contains(target)) {
+        setWorkspaceExpanded(false)
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setUserMenuOpen(false)
+        setWorkspaceExpanded(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
+
+  useEffect(() => {
+    setUserMenuOpen(false)
+    setWorkspaceExpanded(false)
+    setMobileOpen(false)
+  }, [location.pathname])
 
   useEffect(() => {
     if (mobileOpen) {
@@ -167,99 +247,179 @@ function AuthenticatedLayout() {
             <X size={18} />
           </button>
         </div>
-        <div className="workspace-label">WORKSPACE</div>
-        <button
-          className={`workspace-switcher ${workspaceExpanded ? 'workspace-switcher-expanded' : ''}`}
-          type="button"
-          aria-expanded={workspaceExpanded}
-          onClick={() => setWorkspaceExpanded((expanded) => !expanded)}
-        >
-          <span className="workspace-avatar">{user.name.slice(0, 1).toUpperCase()}</span>
-          <span className="workspace-copy">
-            <strong>{user.role === 'OWNER' ? 'Owner workspace' : 'Tenant portal'}</strong>
-            <small>{user.name}</small>
-          </span>
-          <ChevronDown size={15} />
-        </button>
 
-        {workspaceExpanded && (
-          <div className="workspace-switcher-menu" role="menu">
-            <div className="workspace-menu-header">SWITCH WORKSPACE</div>
-
-            {/* Owner Workspace Item */}
-            <button
-              type="button"
-              className={`workspace-menu-item ${user.role === 'OWNER' ? 'workspace-menu-item-active' : ''}`}
-              onClick={() => void handleSelectWorkspace('OWNER')}
-            >
-              <div className="workspace-menu-item-icon"><Building2 size={16} /></div>
-              <div className="workspace-menu-item-copy">
-                <strong>Owner workspace</strong>
-                <small>{userRoles.includes('OWNER') ? 'Manage properties & leases' : 'Activate property management'}</small>
+        <div className="sidebar-workspace-wrap" ref={workspaceRef}>
+          <button
+            className={`workspace-card ${workspaceExpanded ? 'workspace-card-expanded' : ''}`}
+            type="button"
+            aria-expanded={workspaceExpanded}
+            onClick={() => setWorkspaceExpanded((expanded) => !expanded)}
+          >
+            <div className="workspace-card-icon">
+              {user.role === 'OWNER' ? <Building2 size={22} /> : <Home size={22} />}
+            </div>
+            <div className="workspace-card-details">
+              <div className="workspace-card-title-row">
+                <span className="workspace-card-title">
+                  {user.role === 'OWNER' ? 'Owner workspace' : 'Tenant portal'}
+                </span>
+                <ChevronRight size={15} className="workspace-card-chevron" />
               </div>
-              {user.role === 'OWNER' ? (
-                <span className="workspace-active-badge"><Check size={14} /> Active</span>
-              ) : userRoles.includes('OWNER') ? (
-                badges?.ownerPendingApprovals ? (
-                  <span className="workspace-badge workspace-badge-alert" title="Pending rent approvals">{badges.ownerPendingApprovals} pending</span>
-                ) : badges?.ownerOpenTickets ? (
-                  <span className="workspace-badge" title="Open maintenance tickets">{badges.ownerOpenTickets} open</span>
-                ) : null
-              ) : (
-                <span className="workspace-badge workspace-badge-activate"><Sparkles size={11} /> Activate</span>
-              )}
-            </button>
+              <div className="workspace-card-subtitle">{user.name}</div>
+            </div>
+          </button>
 
-            {/* Tenant Portal Item */}
-            <button
-              type="button"
-              className={`workspace-menu-item ${user.role === 'TENANT' ? 'workspace-menu-item-active' : ''}`}
-              onClick={() => void handleSelectWorkspace('TENANT')}
-            >
-              <div className="workspace-menu-item-icon"><Home size={16} /></div>
-              <div className="workspace-menu-item-copy">
-                <strong>Tenant portal</strong>
-                <small>{userRoles.includes('TENANT') ? 'My home, rents & tickets' : 'Activate tenant capabilities'}</small>
-              </div>
-              {user.role === 'TENANT' ? (
-                <span className="workspace-active-badge"><Check size={14} /> Active</span>
-              ) : userRoles.includes('TENANT') ? (
-                badges?.tenantPendingRents ? (
-                  <span className="workspace-badge workspace-badge-alert" title="Outstanding rent due">{badges.tenantPendingRents} rent due</span>
-                ) : badges?.tenantUnreadNotices ? (
-                  <span className="workspace-badge" title="Unread notices">{badges.tenantUnreadNotices} notice</span>
-                ) : null
-              ) : (
-                <span className="workspace-badge workspace-badge-activate"><Sparkles size={11} /> Activate</span>
-              )}
-            </button>
+          {workspaceExpanded && (
+            <div className="workspace-switcher-menu" role="menu">
+              <div className="workspace-menu-header">SWITCH WORKSPACE</div>
 
-            <div className="workspace-menu-divider" />
-            <button
-              type="button"
-              className="workspace-profile-button"
-              onClick={() => {
-                setWorkspaceExpanded(false)
-                navigate('/profile')
-              }}
-            >
-              <UserRound size={16} />
-              <span>Profile & Account</span>
-            </button>
-          </div>
-        )}
+              {/* Owner Workspace Item */}
+              <button
+                type="button"
+                className={`workspace-menu-item ${user.role === 'OWNER' ? 'workspace-menu-item-active' : ''}`}
+                onClick={() => void handleSelectWorkspace('OWNER')}
+              >
+                <div className="workspace-menu-item-icon"><Building2 size={16} /></div>
+                <div className="workspace-menu-item-copy">
+                  <strong>Owner workspace</strong>
+                  <small>{userRoles.includes('OWNER') ? 'Manage properties & leases' : 'Activate property management'}</small>
+                </div>
+                {user.role === 'OWNER' ? (
+                  <span className="workspace-active-badge"><Check size={14} /> Active</span>
+                ) : userRoles.includes('OWNER') ? (
+                  badges?.ownerPendingApprovals ? (
+                    <span className="workspace-badge workspace-badge-alert" title="Pending rent approvals">{badges.ownerPendingApprovals} pending</span>
+                  ) : badges?.ownerOpenTickets ? (
+                    <span className="workspace-badge" title="Open maintenance tickets">{badges.ownerOpenTickets} open</span>
+                  ) : null
+                ) : (
+                  <span className="workspace-badge workspace-badge-activate"><Sparkles size={11} /> Activate</span>
+                )}
+              </button>
+
+              {/* Tenant Portal Item */}
+              <button
+                type="button"
+                className={`workspace-menu-item ${user.role === 'TENANT' ? 'workspace-menu-item-active' : ''}`}
+                onClick={() => void handleSelectWorkspace('TENANT')}
+              >
+                <div className="workspace-menu-item-icon"><Home size={16} /></div>
+                <div className="workspace-menu-item-copy">
+                  <strong>Tenant portal</strong>
+                  <small>{userRoles.includes('TENANT') ? 'My home, rents & tickets' : 'Activate tenant capabilities'}</small>
+                </div>
+                {user.role === 'TENANT' ? (
+                  <span className="workspace-active-badge"><Check size={14} /> Active</span>
+                ) : userRoles.includes('TENANT') ? (
+                  badges?.tenantPendingRents ? (
+                    <span className="workspace-badge workspace-badge-alert" title="Outstanding rent due">{badges.tenantPendingRents} rent due</span>
+                  ) : badges?.tenantUnreadNotices ? (
+                    <span className="workspace-badge" title="Unread notices">{badges.tenantUnreadNotices} notice</span>
+                  ) : null
+                ) : (
+                  <span className="workspace-badge workspace-badge-activate"><Sparkles size={11} /> Activate</span>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
 
         <nav className="side-nav" aria-label="Main navigation">
-          <div className="workspace-label">MANAGE</div>
-          {links.map(({ to, label, icon: Icon }) => (
-            <NavLink key={to} to={to} className={({ isActive }) => `nav-link ${isActive ? 'nav-link-active' : ''}`}>
-              <Icon size={17} strokeWidth={1.8} />
-              <span>{label}</span>
-            </NavLink>
+          {navSections.map((section) => (
+            <div key={section.title} className="nav-section">
+              <div className="nav-section-title">{section.title}</div>
+              {section.items.map(({ to, label, icon: Icon }) => {
+                const isSettings = to === '/settings'
+                const isPayments = to === '/owner/rent' || to === '/tenant/rent'
+                const isFaq = to === '/faq'
+
+                return (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    className={({ isActive }) => {
+                      const active =
+                        isActive ||
+                        (isSettings && (location.pathname === '/profile' || location.pathname === '/settings')) ||
+                        (isPayments && (location.pathname.startsWith('/owner/payments') || location.pathname.startsWith('/tenant/payments'))) ||
+                        (isFaq && (location.pathname === '/faq' || location.pathname === '/help'))
+                      return `nav-link ${active ? 'nav-link-active' : ''}`
+                    }}
+                  >
+                    <Icon size={18} strokeWidth={1.8} />
+                    <span>{label}</span>
+                  </NavLink>
+                )
+              })}
+            </div>
           ))}
         </nav>
-        <div className="sidebar-bottom">
-          <button className="nav-link nav-link-button" onClick={() => navigate('/faq')}><CircleHelp size={17} /><span>FAQ</span></button>
+
+        <div className="sidebar-bottom-user-wrap" ref={userMenuRef}>
+          {userMenuOpen && (
+            <div className="sidebar-user-menu" role="menu">
+              <button
+                type="button"
+                className="sidebar-user-menu-item"
+                onClick={() => {
+                  setUserMenuOpen(false)
+                  navigate('/settings')
+                }}
+              >
+                <Settings size={16} />
+                <span>Profile & Settings</span>
+              </button>
+
+              <div className="workspace-menu-divider" />
+
+              <button
+                type="button"
+                className="sidebar-user-menu-item sidebar-user-menu-danger"
+                onClick={() => {
+                  setUserMenuOpen(false)
+                  setConfirmSignOut(true)
+                }}
+              >
+                <LogOut size={16} />
+                <span>Sign out</span>
+              </button>
+            </div>
+          )}
+
+          <div
+            className="sidebar-bottom-user"
+            onClick={() => setUserMenuOpen((open) => !open)}
+            role="button"
+            tabIndex={0}
+            aria-haspopup="menu"
+            aria-expanded={userMenuOpen}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setUserMenuOpen((open) => !open)
+              }
+            }}
+          >
+            <div className="sidebar-user-avatar">
+              {user.name.slice(0, 1).toUpperCase()}
+            </div>
+            <div className="sidebar-user-copy">
+              <strong>{user.name}</strong>
+              <small>{user.role === 'OWNER' ? 'Owner account' : 'Tenant account'}</small>
+            </div>
+            <button
+              type="button"
+              className="sidebar-user-more"
+              aria-label="User account actions"
+              title="User account actions"
+              onClick={(e) => {
+                e.stopPropagation()
+                setUserMenuOpen((open) => !open)
+              }}
+            >
+              <MoreHorizontal size={18} />
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -269,11 +429,11 @@ function AuthenticatedLayout() {
           <div className="breadcrumbs">
             <span className="crumb-root">Workspace</span>
             <span className="crumb-separator crumb-root-separator">/</span>
-            {location.pathname === '/profile' ? (
+            {location.pathname === '/profile' || location.pathname === '/settings' ? (
               <>
                 <NavLink to={user.role === 'OWNER' ? '/owner/overview' : '/tenant/overview'}>Overview</NavLink>
                 <span className="crumb-separator">/</span>
-                <strong>Profile</strong>
+                <strong>Profile & Settings</strong>
               </>
             ) : isActivationPage ? (
               <>
@@ -303,7 +463,7 @@ function AuthenticatedLayout() {
               </>
             ) : isOwnerTenantDetail ? (
               <>
-                <NavLink to="/owner/leases">Tenants & leases</NavLink>
+                <NavLink to="/owner/leases">Tenants & Leases</NavLink>
                 <span className="crumb-separator">/</span>
                 <strong>Tenant details</strong>
               </>
@@ -417,12 +577,14 @@ function App() {
       <Route element={<AuthenticatedLayout />}>
         <Route index element={<DefaultRoute />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="settings" element={<ProfilePage />} />
         <Route path="workspace/activate/:role" element={<WorkspaceActivationPage />} />
         <Route path="owner/overview" element={user?.role === 'OWNER' ? <DashboardPage /> : <Navigate to={defaultPage} replace />} />
         <Route path="owner/properties" element={user?.role === 'OWNER' ? <PropertiesPage /> : <Navigate to={defaultPage} replace />} />
         <Route path="owner/leases" element={user?.role === 'OWNER' ? <LeasesPage /> : <Navigate to={defaultPage} replace />} />
         <Route path="owner/leases/tenants/:tenantId" element={user?.role === 'OWNER' ? <OwnerTenantDetailPage /> : <Navigate to={defaultPage} replace />} />
         <Route path="owner/rent" element={user?.role === 'OWNER' ? <RentPage /> : <Navigate to={defaultPage} replace />} />
+        <Route path="owner/payments" element={<Navigate to="/owner/rent" replace />} />
         <Route path="owner/maintenance" element={user?.role === 'OWNER' ? <MaintenancePage /> : <Navigate to={defaultPage} replace />} />
         <Route path="owner/maintenance/:requestId" element={user?.role === 'OWNER' ? <MaintenanceDetailPage /> : <Navigate to={defaultPage} replace />} />
         <Route path="owner/notices" element={user?.role === 'OWNER' ? <NoticesPage /> : <Navigate to={defaultPage} replace />} />
@@ -430,6 +592,7 @@ function App() {
         <Route path="tenant/overview" element={user?.role === 'TENANT' ? <DashboardPage /> : <Navigate to={defaultPage} replace />} />
         <Route path="tenant/leases/:leaseId" element={user?.role === 'TENANT' ? <TenantLeaseDetailPage /> : <Navigate to={defaultPage} replace />} />
         <Route path="tenant/rent" element={user?.role === 'TENANT' ? <RentPage /> : <Navigate to={defaultPage} replace />} />
+        <Route path="tenant/payments" element={<Navigate to="/tenant/rent" replace />} />
         <Route path="tenant/maintenance" element={user?.role === 'TENANT' ? <MaintenancePage /> : <Navigate to={defaultPage} replace />} />
         <Route path="tenant/maintenance/:requestId" element={user?.role === 'TENANT' ? <MaintenanceDetailPage /> : <Navigate to={defaultPage} replace />} />
         <Route path="tenant/notices" element={user?.role === 'TENANT' ? <NoticesPage /> : <Navigate to={defaultPage} replace />} />

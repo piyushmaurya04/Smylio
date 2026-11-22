@@ -53,7 +53,7 @@ public class UserService {
         requireText(request.getPassword(), "password");
         requireText(request.getPhone(), "phone");
         if (request.getPassword().getBytes(StandardCharsets.UTF_8).length > 72) {
-            throw new IllegalArgumentException("Password must be 72 UTF-8 bytes or fewer");
+            throw new IllegalArgumentException("Password must be 72 characters or fewer");
         }
 
         UserRole role;
@@ -142,7 +142,7 @@ public class UserService {
             throw new IllegalArgumentException("New password must be at least 8 characters");
         }
         if (request.getNewPassword().getBytes(StandardCharsets.UTF_8).length > 72) {
-            throw new IllegalArgumentException("New password must be 72 UTF-8 bytes or fewer");
+            throw new IllegalArgumentException("New password must be 72 characters or fewer");
         }
 
         User user = requireUser(userId);
